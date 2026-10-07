@@ -1,6 +1,6 @@
 {
   "name": "react-native-india-maps",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "React Native SDK for India Maps using MapLibre GL with Ola Maps and Mappls (MapMyIndia) APIs",
   "source": "./src/index.ts",
   "main": "./lib/commonjs/index.js",
