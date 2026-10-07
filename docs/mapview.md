@@ -17,7 +17,7 @@
 | `cameraProps` | `object` | Extra props passed to the MapLibre `Camera` component. |
 | `onMapReady` | `() => void` | Called when the map finishes loading. |
 
-All other MapLibre `Map` props (`style`, `onRegionDidChange`, etc.) are passed through unchanged.
+MapLibre `Map` props such as `onRegionDidChange` are passed through. `mapStyle` is managed by this component from `styleName` and cannot be overridden as a separate prop.
 
 ## Example
 
@@ -61,14 +61,22 @@ Rendering support differs between the two providers:
 | Static map image | PNG / JPEG / WebP | **PNG only** — the still-image endpoint has no format parameter |
 | REST APIs | Full | Full |
 
-When `provider: 'mappls'`, `getStyleURL()` returns the style **name** rather than
-a URL, because there is no public endpoint to fetch it from. Pass your own
-MapLibre style object or a third-party raster style in that case:
+When `provider: 'mappls'`, `getStyleURL()` returns `styleName` unchanged; it
+cannot look up a Mappls style because there is no public vector style endpoint.
+You can pass a valid external MapLibre style URL using `styleName`:
 
 ```tsx
-// Mappls has no public vector style endpoint — supply your own style.
-<MapView mapStyle={myOwnStyleObject} style={{ flex: 1 }} />
+// Supply a MapLibre style URL; Mappls does not provide a public vector style.
+<MapView
+  styleName="https://demotiles.maplibre.org/style.json"
+  style={{ flex: 1 }}
+/>
 ```
+
+`MapView` manages the underlying `mapStyle` prop, so an in-memory style object
+cannot be passed through this wrapper. For that use case, render MapLibre's
+`Map` component directly and use `IndiaMapsClient` separately for Mappls REST
+APIs.
 
 For static images, requesting `format: 'jpg'` under Mappls silently returns
 PNG, because `/map/raster_tile/still_image` only emits 8-bit PNG.

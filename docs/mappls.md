@@ -249,6 +249,19 @@ Ola Maps static map API:
 | Format | extension in the path | PNG only, no parameter |
 | Markers | `marker` | `markers` |
 
+## Verification sources
+
+The endpoint/resource details above were checked against these Mappls-maintained
+REST guides and the [published React Native package](https://www.npmjs.com/package/mappls-map-react-native):
+
+- [Directions](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-routing-api/readme.md)
+- [Distance matrix](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-distance-matrix-api/readme.md)
+- [Route optimization](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-route-optimization-api/readme.md)
+- [Reverse geocoding](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-maps-reverse-geocoding-rest-api-example/Readme.md)
+- [Snap to road](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-snapToRoad-api/readme.md)
+- [Autosuggest](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-maps-auto-suggest-api-example/Readme.md)
+- [Static map image](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-still-map-image-api/readme.md)
+
 ## Related
 
 - [MapView](./mapview.md) — rendering and style support
