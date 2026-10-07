@@ -1,0 +1,1224 @@
+openapi: 3.0.3
+
+info:
+  title: Mappls REST APIs (India Maps SDK surface)
+  version: '0.7.0'
+  description: |
+    Machine-readable contract for the subset of the Mappls REST API consumed by
+    `react-native-india-maps`.
+
+    ## Provenance
+
+    Every path, parameter, enum, limit and response envelope below was
+    transcribed from the canonical Mappls documentation repository
+    ([`mappls-api/mappls-rest-apis`](https://github.com/mappls-api/mappls-rest-apis))
+    and independently corroborated against the published
+    [`mappls-map-react-native`](https://www.npmjs.com/package/mappls-map-react-native)
+    package (v2.0.3, published 2026-07-28), whose open-source
+    `src/modules/restApi/` layer exposes the vendor's request/response models
+    and criteria constants.
+
+    Where the published SDK wraps a request in an options object and delegates
+    to the closed-source native SDK, this file reflects the REST contract that
+    the native SDK implements.
+
+    ## Scope
+
+    Only endpoints reachable through this library's public API are described.
+    Predictive (`routev2`) and account-restricted endpoints are intentionally
+    omitted; see the `x-sdk` notes on the relevant operations.
+
+    ## Authentication
+
+    All endpoints authenticate with an `access_token` query parameter.
+  license:
+    name: Proprietary
+    url: https://about.mappls.com/api/terms-&-conditions
+
+servers:
+  - url: https://search.mappls.com
+    description: Search, geocoding and text search
+  - url: https://place.mappls.com
+    description: Place details
+  - url: https://route.mappls.com
+    description: Routing, distance matrix, optimization, snap-to-road
+  - url: https://sdk.mappls.com
+    description: Elevation
+  - url: https://tile.mappls.com
+    description: Raster still-image tiles
+
+tags:
+  - name: Places
+  - name: Routing
+  - name: Roads
+  - name: Elevation
+  - name: Tiles
+
+security:
+  - accessToken: []
+
+paths:
+  /search/places/autosuggest/json:
+    get:
+      tags: [Places]
+      operationId: placesAutocomplete
+      summary: Autosuggest (autocomplete) search
+      description: |
+        Returns place suggestions for a partial query.
+
+        Corroborated by the published SDK's `RestApi.autoSuggest`
+        (`AutoSuggestRequest`) and `AutoSuggestCriteria` constants.
+      x-sdk:
+        clientMethod: RestApi.autoSuggest
+        npmPackage: mappls-map-react-native@2.0.3
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - $ref: '#/components/parameters/Region'
+        - name: query
+          in: query
+          required: true
+          description: Partial search text. Maximum length is 45 characters.
+          schema: { type: string, maxLength: 45 }
+          example: mapmyindia
+        - name: location
+          in: query
+          description: |
+            Location bias as `latitude,longitude`. Required for `hyperLocal`.
+            Not applicable outside India (IND).
+          schema: { type: string, pattern: '^-?\d+(\.\d+)?,-?\d+(\.\d+)?$' }
+          example: 28.454,77.435
+        - name: zoom
+          in: query
+          description: Current map scope zoom (4-18). India only.
+          schema: { type: number, minimum: 4, maximum: 18 }
+        - name: pod
+          in: query
+          $ref: '#/components/schemas/AutosuggestPod'
+        - name: filter
+          in: query
+          description: |
+            Restrict results by bounded area, eLoc or PIN, e.g. `pin:110020`,
+            `bounds:lat1,lng1;lat2,lng2`, `cop:{eLoc}`. India only.
+          schema: { type: string }
+        - name: bridge
+          in: query
+          description: |
+            Valueless flag initiating a bridge for nearby searches in
+            `suggestedSearches`. India only.
+          schema: { type: string, enum: [''] }
+        - name: hyperLocal
+          in: query
+          description: |
+            Rank nearby results higher relative to the `location` bias. Works
+            only with `location`. India only.
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Suggestions for the query
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestedLocations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AtlasResult' }
+                  suggestedSearches:
+                    type: array
+                    items: { $ref: '#/components/schemas/AtlasResult' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /search/address/geocode:
+    get:
+      tags: [Places]
+      operationId: placesGeocode
+      summary: Forward geocoding
+      description: |
+        Converts an address into coordinates.
+
+        Corroborated by the published SDK's `RestApi.geocode`
+        (`GeoCodeRequest`, `GeoCodingCriteria`).
+      x-sdk:
+        clientMethod: RestApi.geocode
+        npmPackage: mappls-map-react-native@2.0.3
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: address
+          in: query
+          required: true
+          description: Address to geocode.
+          schema: { type: string }
+          example: 237 Okhla industrial estate phase 3 new delhi, delhi 110020
+        - name: itemCount
+          in: query
+          description: Maximum number of result items.
+          schema: { type: integer, minimum: 1 }
+          example: 1
+        - name: region
+          in: query
+          $ref: '#/components/parameters/RegionValue'
+        - name: podFilter
+          in: query
+          description: Restrict results to a place type code.
+          schema: { $ref: '#/components/schemas/GeocodePod' }
+        - name: bound
+          in: query
+          description: Bounding box filter. Mutually exclusive with `podFilter`.
+          schema: { type: string }
+        - name: bias
+          in: query
+          description: Result bias applied to the match level.
+          schema: { type: number, enum: [0, 1, 2] }
+        - name: scores
+          in: query
+          description: Include confidence scores in the response.
+          schema: { type: boolean }
+        - name: lang
+          in: query
+          description: Premium regional language code.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Matching places
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  copResults:
+                    description: |
+                      A single object for a one-result lookup, or an array when
+                      `itemCount` is greater than 1.
+                    oneOf:
+                      - $ref: '#/components/schemas/GeocodeResult'
+                      - type: array
+                        items: { $ref: '#/components/schemas/GeocodeResult' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /search/address/rev-geocode:
+    get:
+      tags: [Places]
+      operationId: placesReverseGeocode
+      summary: Reverse geocoding
+      description: |
+        Converts coordinates into the closest matching address and nearest
+        popular landmark.
+
+        **Response envelope:** `results` is a single object, not an array. The
+        published SDK's `ReverseGeoCodeModel.ts` types it as
+        `results?: Array<Place>`, but that is the SDK's own convenience type —
+        the REST endpoint documented by Mappls returns an object, and clients
+        must tolerate both shapes.
+      x-sdk:
+        clientMethod: RestApi.reverseGeocode
+        npmPackage: mappls-map-react-native@2.0.3
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: lat
+          in: query
+          required: true
+          description: Latitude of the location.
+          schema: { type: number }
+          example: 28.6139
+        - name: lng
+          in: query
+          required: true
+          description: Longitude of the location.
+          schema: { type: number }
+          example: 77.209
+        - $ref: '#/components/parameters/Region'
+        - name: lang
+          in: query
+          description: Language code; `hi` for Hindi.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Closest matching address
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  responseCode: { type: integer, example: 200 }
+                  version: { type: string, example: 211.19 }
+                  results:
+                    description: A single address object.
+                    oneOf:
+                      - $ref: '#/components/schemas/ReverseGeocodeResult'
+                      - type: array
+                        items: { $ref: '#/components/schemas/ReverseGeocodeResult' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /O2O/entity/place-details/{eLoc}:
+    get:
+      tags: [Places]
+      operationId: placesPlaceDetails
+      summary: Place details by eLoc
+      description: |
+        Retrieves detailed information for a place identified by its 6-character
+        eLoc (`mapplsPin`).
+
+        **Host:** `place.mappls.com`. **Response:** a flat object with
+        `eloc`, `name`, `address` and `type` at the top level — there is no
+        `results` envelope. Confirmed by the published SDK's
+        `PlaceDetailResponse.ts`, which declares `mapplsPin`, `latitude`,
+        `longitude`, `placeName` and `address` as top-level fields.
+
+        Some accounts retain the legacy `/apis/O2O/entity/{eLoc}` alias; this
+        package targets the current path.
+      x-sdk:
+        clientMethod: RestApi.placeDetail
+        npmPackage: mappls-map-react-native@2.0.3
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: eLoc
+          in: path
+          required: true
+          description: 6-character alphanumeric eLoc of the place.
+          schema: { type: string, minLength: 6, maxLength: 6 }
+          example: 3F45CB
+      responses:
+        '200':
+          description: Place details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaceDetails' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /search/places/nearby/json:
+    get:
+      tags: [Places]
+      operationId: placesNearbySearch
+      summary: Nearby search
+      description: |
+        Searches for nearby points of interest by `keywords` around a reference
+        location.
+
+        `keywords` is **required**. `pod` overrides `keywords` when both are
+        supplied.
+      x-sdk:
+        clientMethod: RestApi.nearby
+        npmPackage: mappls-map-react-native@2.0.3
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - $ref: '#/components/parameters/Region'
+        - name: keywords
+          in: query
+          required: true
+          description: |
+            Search terms. Supports `;` as OR and `$` as AND, e.g.
+            `coffee ; tea $ sea food`.
+          schema: { type: string, minLength: 1 }
+          example: FODCOF
+        - name: refLocation
+          in: query
+          required: true
+          description: 'Reference location as `latitude,longitude`, or an eLoc.'
+          schema: { type: string }
+          example: 28.454,77.435
+        - name: page
+          in: query
+          description: Page number of results.
+          schema: { type: integer, minimum: 1 }
+          example: 1
+        - name: radius
+          in: query
+          description: Search radius in meters. Minimum 500, maximum 10000.
+          schema: { type: integer, minimum: 500, maximum: 10000 }
+        - name: bounds
+          in: query
+          description: Bounding box as `lat1,lng1;lat2,lng2`.
+          schema: { type: string }
+        - name: filter
+          in: query
+          description: Category or attribute filters, e.g. `categoryCode:FODCOF`.
+          schema: { type: string }
+        - name: sortBy
+          in: query
+          description: Result ordering.
+          schema:
+            type: string
+            enum: ['dist:asc', 'dist:desc', 'imp']
+            default: 'dist:asc'
+        - name: searchBy
+          in: query
+          description: Search strategy.
+          schema:
+            type: string
+            enum: ['dist', 'imp']
+            default: 'dist'
+        - name: pod
+          in: query
+          description: |
+            Place type code restricting results. Overrides `keywords`.
+            Backend-controlled.
+          schema: { $ref: '#/components/schemas/NearbyPod' }
+        - name: richData
+          in: query
+          description: Include rich point-of-interest data.
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Nearby places
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestedLocations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AtlasResult' }
+                  pageInfo: { $ref: '#/components/schemas/PageInfo' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /search/places/textsearch/json:
+    get:
+      tags: [Places]
+      operationId: placesTextSearch
+      summary: Text search
+      description: |
+        Searches places with a free-text `query`, optionally biased by location
+        and filtered by PIN.
+
+        Returns `suggestedLocations`; user-contributed results appear under
+        `userAddedLocations`.
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - $ref: '#/components/parameters/Region'
+        - name: query
+          in: query
+          required: true
+          description: Text string to search for.
+          schema: { type: string }
+          example: Coffee
+        - name: location
+          in: query
+          description: Location bias as `latitude,longitude`.
+          schema: { type: string, pattern: '^-?\d+(\.\d+)?,-?\d+(\.\d+)?$' }
+          example: 28.6139,77.209
+        - name: filter
+          in: query
+          description: Filter by pincode, e.g. `pin:110020`.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Matching places
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestedLocations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AtlasResult' }
+                  userAddedLocations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AtlasResult' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /route/direction/{resource}/{profile}/{geopositions}:
+    post:
+      tags: [Routing]
+      operationId: routingDirections
+      summary: Directions
+      description: |
+        Calculates routes between an origin and a destination with optional via
+        points.
+
+        `geopositions` is a semicolon-separated list of `longitude,latitude`
+        pairs or eLocs. The first is the origin and the last is the destination.
+
+        **Profile/resource matrix** (enforced by Mappls):
+
+        | Profile  | Allowed resources                   |
+        | -------- | ----------------------------------- |
+        | driving  | `route_adv`, `route_eta`, `route_traffic` |
+        | biking   | `route_adv`, `route_traffic`        |
+        | walking  | `route_adv`                         |
+        | trucking | `route_adv`, `route_eta`            |
+
+        `route_eta` and `route_traffic` apply to India only (`region=ind`) and do
+        not support `rtype=1`. `biking`, `walking` and `trucking` do not
+        support `region` or `rtype`.
+      x-sdk:
+        clientMethod: RestApi.direction
+        npmPackage: mappls-map-react-native@2.0.3
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: resource
+          in: path
+          required: true
+          description: Routing service variant.
+          schema: { $ref: '#/components/schemas/RouteResource' }
+        - name: profile
+          in: path
+          required: true
+          description: Transport mode.
+          schema: { $ref: '#/components/schemas/RouteProfile' }
+        - name: geopositions
+          in: path
+          required: true
+          description: 'Semicolon-separated `longitude,latitude` pairs or eLocs.'
+          schema: { type: string }
+          example: 77.131123,28.552413;17ZUL7
+        - name: geometries
+          in: query
+          description: Route geometry format and density.
+          schema:
+            type: string
+            enum: [polyline, polyline6, geojson]
+            default: polyline
+        - name: steps
+          in: query
+          description: Include turn-by-turn steps for each leg.
+          schema: { type: boolean, default: false }
+        - name: overview
+          in: query
+          description: |
+            Overview geometry detail. Only `simplified`, `full` and `false` are
+            valid; omitting the parameter requests the default (`simplified`).
+            `false` is a premium offering.
+          schema:
+            type: string
+            enum: [simplified, full, 'false']
+            default: simplified
+        - name: exclude
+          in: query
+          description: Road classes to avoid, dot-separated.
+          schema:
+            type: string
+            enum: ['toll', 'motorway', 'ferry']
+          example: toll.ferry
+        - name: rtype
+          in: query
+          description: 0 for optimal (default), 1 for shortest. Premium.
+          schema: { type: integer, enum: [0, 1] }
+        - name: alternatives
+          in: query
+          description: Number of alternative routes to search for. Premium.
+          schema: { type: integer }
+        - name: region
+          in: query
+          $ref: '#/components/parameters/RegionValue'
+        - name: bearings
+          in: query
+          description: 'Restrict to segments with the given bearings. Premium.'
+          schema: { type: integer }
+        - name: radiuses
+          in: query
+          description: 'Per-waypoint search radii in meters. Premium.'
+          schema: { type: string }
+      responses:
+        '200':
+          description: Calculated routes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DirectionsResponse' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /route/dm/{resource}/{profile}/{geopositions}:
+    get:
+      tags: [Routing]
+      operationId: routingDistanceMatrix
+      summary: Distance matrix
+      description: |
+        Computes distance and duration from sources to destinations.
+
+        **Maximum 100 total points**, counting source and secondary positions.
+
+        **Supported profiles:** `driving`, `biking`, `trucking`.
+        `walking` is **not** supported by this endpoint. `biking` and
+        `trucking` are restricted to the `distance_matrix` resource and do not
+        support `region` or `rtype`.
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: resource
+          in: path
+          required: true
+          description: Distance-matrix service variant.
+          schema: { $ref: '#/components/schemas/DistanceMatrixResource' }
+        - name: profile
+          in: path
+          required: true
+          description: |
+            Transport mode. `walking` is not offered by this endpoint; use
+            `/routev2/dm/distance` for pedestrian matrices.
+          schema:
+            type: string
+            enum: [driving, biking, trucking]
+        - name: geopositions
+          in: path
+          required: true
+          description: 'Semicolon-separated `longitude,latitude` pairs or eLocs.'
+          schema: { type: string }
+          example: 77.268931,28.550614;77.208156,28.566618
+        - name: sources
+          in: query
+          description: Semicolon-separated indices treated as sources.
+          schema: { type: string }
+        - name: destinations
+          in: query
+          description: Semicolon-separated indices treated as destinations.
+          schema: { type: string }
+        - name: rtype
+          in: query
+          description: 0 for optimal (default), 1 for shortest.
+          schema: { type: integer, enum: [0, 1] }
+        - name: region
+          in: query
+          $ref: '#/components/parameters/RegionValue'
+      responses:
+        '200':
+          description: Distance and duration grids
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DistanceMatrixResponse' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /route/optimization/{resource}/{profile}/{coordinates}:
+    post:
+      tags: [Routing]
+      operationId: routingRouteOptimization
+      summary: Route optimization
+      description: |
+        Optimizes the visiting order of a set of coordinates.
+
+        **Profile/resource matrix** (enforced by Mappls):
+
+        | Profile  | Allowed resources                                   |
+        | -------- | --------------------------------------------------- |
+        | driving  | `trip_optimization`, `trip_optimization_eta`, `trip_optimization_traffic` |
+        | biking   | `trip_optimization`, `trip_optimization_traffic`     |
+        | walking  | `trip_optimization`                                   |
+        | trucking | `trip_optimization`, `trip_optimization_eta`          |
+
+        `biking`, `walking` and `trucking` do not support `region` or `rtype`.
+        `trip_optimization_eta` and `trip_optimization_traffic` apply to India
+        only and do not support `rtype=1`.
+
+        **roundtrip / source / destination:** not every combination is
+        supported. The server accepts only the rows below; any other
+        combination returns an error.
+
+        | roundtrip | source | destination |
+        | --------- | ------ | ----------- |
+        | `true`    | `first` | `last`      |
+        | `true`    | `first` | `any`       |
+        | `true`    | `any`   | `last`      |
+        | `true`    | `any`   | `any`       |
+        | `false`   | `first` | `last`      |
+
+        Server defaults are `roundtrip=true`, `source=any`, `destination=any`.
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: resource
+          in: path
+          required: true
+          description: Optimization service variant.
+          schema: { $ref: '#/components/schemas/OptimizationResource' }
+        - name: profile
+          in: path
+          required: true
+          description: Transport mode.
+          schema: { $ref: '#/components/schemas/RouteProfile' }
+        - name: coordinates
+          in: path
+          required: true
+          description: 'Semicolon-separated `longitude,latitude` pairs. Minimum two.'
+          schema: { type: string }
+          example: 77.235500,28.627136;77.107227,28.720863
+        - name: region
+          in: query
+          $ref: '#/components/parameters/RegionValue'
+        - name: geometries
+          in: query
+          description: Route geometry format and density.
+          schema:
+            type: string
+            enum: [polyline, polyline6, geojson]
+            default: polyline
+        - name: overview
+          in: query
+          description: Overview geometry detail.
+          schema:
+            type: string
+            enum: [simplified, full, 'false']
+            default: simplified
+        - name: steps
+          in: query
+          description: Return route steps for each leg.
+          schema: { type: boolean, default: false }
+        - name: source
+          in: query
+          description: Index of the location to use as the trip source.
+          schema:
+            type: string
+            enum: [first, last, any]
+            default: any
+        - name: destination
+          in: query
+          description: Index of the location to use as the trip destination.
+          schema:
+            type: string
+            enum: [first, last, any]
+            default: any
+        - name: roundtrip
+          in: query
+          description: |
+            Return to the first location after the last stop. When `false`, the
+            only supported pairing is `source=first` with `destination=last`.
+          schema:
+            type: boolean
+            default: true
+        - name: rtype
+          in: query
+          description: 0 for optimal (default), 1 for shortest.
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        '200':
+          description: Optimized routes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OptimizationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /route/movement/snapToRoad:
+    get:
+      tags: [Roads]
+      operationId: roadsSnapToRoad
+      summary: Snap points to the road network
+      description: |
+        Snaps GPS points to the most plausible position on the road network.
+
+        **Maximum 100 points** per request. This is the v1 endpoint; the v2
+        (`/routev2/movement/trace_route`) variant is restricted to select
+        accounts and is intentionally not used by this package.
+      x-sdk:
+        clientMethod: RoadsApi.snapToRoad
+        npmPackage: n/a (HTTP-only in react-native-india-maps)
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: pts
+          in: query
+          required: true
+          description: |
+            Semicolon-separated `longitude,latitude` pairs. The first pair is
+            treated as the start point and the last as the end point.
+          schema: { type: string, minLength: 1 }
+          example: 78.40573,17.37317;78.40958,17.37314
+        - name: timestamps
+          in: query
+          description: Semicolon-separated Unix timestamps, one per point.
+          schema: { type: string }
+        - $ref: '#/components/parameters/Region'
+      responses:
+        '200':
+          description: Snapped points
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  responseCode: { type: integer, example: 200 }
+                  version: { type: string }
+                  results:
+                    type: object
+                    properties:
+                      snappedPoints:
+                        type: array
+                        description: |
+                          One entry per input point. Entries that could not be
+                          snapped are `null`, so positional alignment with the
+                          input is preserved.
+                        items:
+                          nullable: true
+                          allOf: [{ $ref: '#/components/schemas/SnappedPoint' }]
+                      matchings:
+                        type: array
+                        items: { $ref: '#/components/schemas/RouteGeometry' }
+        '204': { $ref: '#/components/responses/NoResults' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /map/utils/elevation:
+    get:
+      tags: [Elevation]
+      operationId: elevationLookup
+      summary: Multi-point elevation
+      description: |
+        Returns elevation for a set of coordinates.
+
+        `locations` is a **pipe-delimited** (`|`) list of `latitude,longitude`
+        pairs — note the delimiter differs from the semicolon-delimited routing
+        endpoints.
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: locations
+          in: query
+          required: true
+          description: Pipe-delimited `latitude,longitude` pairs.
+          schema: { type: string, minLength: 1 }
+          example: 9.538350,76.998825|8.930019,76.655587
+      responses:
+        '200':
+          description: Elevations for the requested locations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  responseCode: { type: integer, example: 200 }
+                  version: { type: string, example: 211.18 }
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/ElevationResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /map/raster_tile/still_image:
+    get:
+      tags: [Tiles]
+      operationId: tilesStaticImage
+      summary: Static map image
+      description: |
+        Returns an 8-bit PNG raster image for the given centre, zoom and size.
+
+        **PNG only.** This endpoint has no format parameter, so callers that
+        request JPEG or WebP still receive PNG. Mappls publishes no public
+        vector tile style endpoint, so a MapLibre style URL is not available
+        for this provider.
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - name: center
+          in: query
+          required: true
+          description: 'Centre of the image as `latitude,longitude`.'
+          schema: { type: string }
+          example: 28.5959394,77.2255611
+        - name: zoom
+          in: query
+          required: true
+          description: Zoom level, 4 to 18.
+          schema: { type: integer, minimum: 4, maximum: 18 }
+          example: 15
+        - name: size
+          in: query
+          required: true
+          description: Image size in pixels as `<width>x<height>`.
+          schema: { type: string, pattern: '^\d+x\d+$' }
+          example: 400x400
+        - name: ssf
+          in: query
+          description: Scale factor for retina output.
+          schema: { type: number }
+          example: 1
+        - name: markers
+          in: query
+          description: |
+            One or more markers as `latitude,longitude`; repeat the parameter
+            for multiple markers.
+          schema: { type: array, items: { type: string } }
+          example: 28.5959394,77.2255611
+        - name: markers_icon
+          in: query
+          description: Icon URL used for the markers.
+          schema: { type: string }
+      responses:
+        '200':
+          description: PNG image
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    accessToken:
+      type: apiKey
+      in: query
+      name: access_token
+
+  parameters:
+    AccessToken:
+      name: access_token
+      in: query
+      required: true
+      description: Mappls API key allocated in the Mappls Console.
+      schema: { type: string }
+      example: hklmgbwzrxncdyavtsuojqpiefrbhqplnm
+
+    Region:
+      name: region
+      in: query
+      required: false
+      description: |
+        ISO country code for the search region. **Mandatory outside India** on
+        autosuggest, geocode, reverse geocode, nearby, text search, directions,
+        distance matrix and snap-to-road. Defaults to `IND`.
+
+        Not supported for the `biking`, `walking` or `trucking` profiles on the
+        routing, distance-matrix and optimization endpoints.
+      schema: { type: string, default: IND, example: IND }
+      x-sdk:
+        note: >-
+          Not currently exposed by react-native-india-maps. Requests outside
+          India must set this manually via `baseUrl`/`searchBaseUrl` query
+          handling until the option is added to the public types.
+
+    RegionValue:
+      name: region
+      in: query
+      required: false
+      description: |
+        ISO country code. Mandatory for countries other than India. See
+        `countryISO.md` in the Mappls REST API repository for valid values.
+      schema: { type: string, default: IND }
+
+  responses:
+    NoResults:
+      description: The request succeeded but no matches were found.
+    BadRequest:
+      description: The request was malformed or a parameter exceeded its limit.
+    Unauthorized:
+      description: The access token is not allowed to make this request.
+    Forbidden:
+      description: |
+        The key exceeded its daily/hourly quota, or the IP/domain is not
+        whitelisted.
+    NotFound:
+      description: The requested resource was not found.
+    PreconditionFailed:
+      description: A mandatory parameter was missing.
+    InternalError:
+      description: An error occurred on the provider side.
+    Unavailable:
+      description: The service is unavailable during maintenance or downtime.
+
+  schemas:
+    RouteResource:
+      type: string
+      description: |
+        - `route_adv` — standard directions.
+        - `route_eta` — applies live-traffic delays to the default route;
+          India only.
+        - `route_traffic` — searches for routes considering live traffic;
+          India only.
+      enum: [route_adv, route_eta, route_traffic]
+      default: route_adv
+
+    RouteProfile:
+      type: string
+      description: Transport mode accepted by routing and optimization.
+      enum: [driving, biking, walking, trucking]
+
+    DistanceMatrixResource:
+      type: string
+      description: Distance-matrix service variant.
+      enum: [distance_matrix, distance_matrix_eta, distance_matrix_traffic]
+      default: distance_matrix
+      x-sdk:
+        note: >-
+          `biking` and `trucking` are restricted to `distance_matrix`; the
+          `_eta` and `_traffic` variants apply to `driving` only.
+
+    OptimizationResource:
+      type: string
+      description: |
+        - `trip_optimization` — optimizes a route without traffic.
+        - `trip_optimization_eta` — optimizes considering live traffic;
+          India only.
+        - `trip_optimization_traffic` — searches routes considering live
+          traffic; India only.
+      enum: [trip_optimization, trip_optimization_eta, trip_optimization_traffic]
+      default: trip_optimization
+
+    AutosuggestPod:
+      type: string
+      description: Place type code restricting autosuggest results. India only.
+      enum: [SLC, LC, CITY, VLG, SDIST, DIST, STATE, SSLC, POI]
+
+    GeocodePod:
+      type: string
+      description: Place type code restricting geocode results.
+      enum: [SLC, LC, CITY, VLG, SDIST, DIST, STATE, SSLC, POI, HOUSE_NAME, HOUSE_NUMBER, PINCODE, STREET]
+
+    NearbyPod:
+      type: string
+      description: |
+        Place type code restricting nearby results. Overrides `keywords`.
+        Access is backend-controlled.
+      enum: [SLC, LC, CITY, STATE]
+
+    PageInfo:
+      type: object
+      properties:
+        pageCount: { type: integer }
+        totalHits: { type: integer }
+        totalPages: { type: integer }
+        pageSize: { type: integer }
+
+    AtlasResult:
+      type: object
+      description: A single place in an autosuggest, nearby or text-search result set.
+      properties:
+        eLoc: { type: string, description: Unique 6-character place identifier. }
+        mapplsPin: { type: string, description: Mappls Pin identifier. }
+        placeName: { type: string }
+        placeAddress: { type: string }
+        formatted_address: { type: string }
+        type: { type: string, description: 'Location type, e.g. `POI`, `City`.' }
+        latitude: { type: number }
+        longitude: { type: number }
+        lat: { type: number }
+        lng: { type: number }
+        distance: { type: string, description: Distance from the reference location. }
+        keywords:
+          type: array
+          items: { type: string }
+        orderIndex: { type: integer }
+        city: { type: string }
+        state: { type: string }
+        pincode: { type: string }
+        hourOfOperation: { type: string }
+
+    GeocodeResult:
+      type: object
+      properties:
+        eloc: { type: string }
+        formattedAddress: { type: string }
+        houseNumber: { type: string }
+        houseName: { type: string }
+        poi: { type: string }
+        street: { type: string }
+        subSubLocality: { type: string }
+        subLocality: { type: string }
+        locality: { type: string }
+        village: { type: string }
+        district: { type: string }
+        subDistrict: { type: string }
+        city: { type: string }
+        state: { type: string }
+        pincode: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        geocodeLevel: { type: string }
+        confidenceScore: { type: number, format: float }
+        elocAdminType: { type: string }
+
+    ReverseGeocodeResult:
+      type: object
+      description: A single reverse-geocoded address.
+      properties:
+        eLoc: { type: string }
+        formatted_address: { type: string }
+        houseNumber: { type: string }
+        houseName: { type: string }
+        poi: { type: string }
+        poi_dist: { type: string }
+        street: { type: string }
+        street_dist: { type: string }
+        subSubLocality: { type: string }
+        subLocality: { type: string }
+        locality: { type: string }
+        village: { type: string }
+        district: { type: string }
+        subDistrict: { type: string }
+        city: { type: string }
+        state: { type: string }
+        pincode: { type: string }
+        lat: { type: string, description: Latitude, sent as a string. }
+        lng: { type: string, description: Longitude, sent as a string. }
+        area: { type: string }
+        areaCode: { type: string, description: ISO country code. }
+        isRooftop: { type: boolean }
+
+    PlaceDetails:
+      type: object
+      description: |
+        Flat place-details response. There is no `results` envelope; these
+        fields are at the top level.
+      properties:
+        eloc: { type: string }
+        name: { type: string }
+        address: { type: string }
+        type:
+          type: string
+          description: 'Matched location type, e.g. `POI`, `HOUSE_NUMBER`.'
+        latitude: { type: number }
+        longitude: { type: number }
+
+    SnappedPoint:
+      type: object
+      properties:
+        location:
+          type: array
+          description: 'Snapped coordinate as `[longitude, latitude]`.'
+          items: { type: number }
+        distance: { type: number, description: Distance from the input point. }
+        waypoint_index: { type: integer }
+        snapped_type: { type: string }
+
+    ElevationResult:
+      type: object
+      properties:
+        latitude: { type: number }
+        longitude: { type: number }
+        elevation: { type: number, description: Elevation in meters. }
+
+    RouteGeometry:
+      type: object
+      properties:
+        geometry: { type: string, description: Encoded polyline geometry. }
+        distance: { type: number }
+        duration: { type: number }
+
+    RouteLeg:
+      type: object
+      properties:
+        distance: { type: number }
+        duration: { type: number }
+        summary: { type: string }
+        weight: { type: number }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              distance: { type: number }
+              duration: { type: number }
+              name: { type: string }
+              ref: { type: string }
+              maneuver: { type: string }
+              instructions: { type: string }
+              geometry: { type: string }
+              location:
+                type: array
+                items: { type: number }
+
+    Route:
+      type: object
+      properties:
+        geometry: { type: string, description: Encoded polyline geometry. }
+        distance: { type: number }
+        duration: { type: number }
+        weight: { type: number }
+        weight_name: { type: string }
+        legs:
+          type: array
+          items: { $ref: '#/components/schemas/RouteLeg' }
+
+    DirectionsResponse:
+      type: object
+      properties:
+        code: { type: string, example: Ok }
+        waypoints:
+          type: array
+          items:
+            type: object
+            properties:
+              hint: { type: string }
+              name: { type: string }
+              location:
+                type: array
+                description: 'Snapped coordinate as `[longitude, latitude]`.'
+                items: { type: number }
+        routes:
+          type: array
+          items: { $ref: '#/components/schemas/Route' }
+
+    DistanceMatrixResponse:
+      type: object
+      properties:
+        responseCode: { type: integer, example: 200 }
+        version: { type: string, example: 191.17 }
+        results:
+          type: object
+          description: Grids are nested under `results`.
+          properties:
+            code: { type: string, example: Ok }
+            distances:
+              type: array
+              description: Distance grid in meters, one row per source.
+              items:
+                type: array
+                items: { type: number }
+            durations:
+              type: array
+              description: Duration grid in seconds, one row per source.
+              items:
+                type: array
+                items: { type: number }
+
+    OptimizationResponse:
+      type: object
+      properties:
+        code: { type: string, example: Ok }
+        routes:
+          type: array
+          items: { $ref: '#/components/schemas/Route' }
+        waypoints:
+          type: array
+          items:
+            type: object
+            properties:
+              location:
+                type: array
+                items: { type: number }
+              waypoint_index: { type: integer }
+        trips_index:
+          type: array
+          description: Visit order as indices into the input coordinates.
+          items: { type: integer }

@@ -24,6 +24,8 @@
     "lib",
     "plugin",
     "app.plugin.js",
+    "ola-maps-apis-oas.yaml",
+    "mappls-apis-oas.yaml",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",

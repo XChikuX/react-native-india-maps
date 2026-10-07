@@ -1,6 +1,6 @@
 # `<MapView />` Component API
 
-`MapView` wraps the MapLibre v11 `Map` component with provider vector tile styles. It resolves its client from the `client` prop, the enclosing `IndiaMapsProvider`, or inline credentials, in that order.
+`MapView` wraps the MapLibre `Map` component (`@maplibre/maplibre-react-native` v11) with provider vector tile styles. It resolves its client from the `client` prop, the enclosing `IndiaMapsProvider`, or inline credentials, in that order.
 
 ## Props
 
@@ -49,6 +49,29 @@ import { MapView, Marker, Polyline } from 'react-native-india-maps';
 - The API key is injected via the style URL query parameter
 - React Native New Architecture is required by MapLibre v11
 - No proprietary native SDKs are required
+
+## Provider support
+
+Rendering support differs between the two providers:
+
+| Capability | Ola Maps | Mappls |
+| --- | --- | --- |
+| Vector style URL | Yes | **No** — Mappls publishes no public vector style endpoint |
+| `getStyleURL()` return value | Full style URL | The bare style name, e.g. `default-light-standard` |
+| Static map image | PNG / JPEG / WebP | **PNG only** — the still-image endpoint has no format parameter |
+| REST APIs | Full | Full |
+
+When `provider: 'mappls'`, `getStyleURL()` returns the style **name** rather than
+a URL, because there is no public endpoint to fetch it from. Pass your own
+MapLibre style object or a third-party raster style in that case:
+
+```tsx
+// Mappls has no public vector style endpoint — supply your own style.
+<MapView style={myOwnStyleObject} style={{ flex: 1 }} />
+```
+
+For static images, requesting `format: 'jpeg'` under Mappls silently returns
+PNG, because `/map/raster_tile/still_image` only emits 8-bit PNG.
 
 ## Available styles
 
