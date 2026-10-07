@@ -15,6 +15,9 @@ import type {
   DirectionsResult,
   DistanceMatrixOptions,
   DistanceMatrixResult,
+  MapplsDistanceMatrixResource,
+  MapplsOptimizationResource,
+  MapplsRouteResource,
   OverviewLevel,
   Route,
   RouteOptimizerOptions,
@@ -28,6 +31,83 @@ const OLA_MAX_WAYPOINTS = 25;
 
 /** Maximum locations accepted by the Ola Maps route-optimizer endpoint. */
 const OLA_MAX_OPTIMIZER_LOCATIONS = 25;
+
+const MAPPLS_DIRECTION_RESOURCES: Partial<
+  Record<TravelMode, readonly MapplsRouteResource[]>
+> = {
+  driving: ['route_adv', 'route_eta', 'route_traffic'],
+  biking: ['route_adv', 'route_traffic'],
+  walking: ['route_adv'],
+  trucking: ['route_adv', 'route_eta'],
+};
+
+const MAPPLS_DISTANCE_MATRIX_RESOURCES: Partial<
+  Record<TravelMode, readonly MapplsDistanceMatrixResource[]>
+> = {
+  driving: [
+    'distance_matrix',
+    'distance_matrix_eta',
+    'distance_matrix_traffic',
+  ],
+  biking: ['distance_matrix'],
+  trucking: ['distance_matrix'],
+};
+
+const MAPPLS_OPTIMIZATION_RESOURCES: Partial<
+  Record<TravelMode, readonly MapplsOptimizationResource[]>
+> = {
+  driving: [
+    'trip_optimization',
+    'trip_optimization_eta',
+    'trip_optimization_traffic',
+  ],
+  biking: ['trip_optimization', 'trip_optimization_traffic'],
+  walking: ['trip_optimization'],
+  trucking: ['trip_optimization', 'trip_optimization_eta'],
+};
+
+const assertMapplsResourceSupportsMode = <TResource extends string>(
+  feature: string,
+  mode: TravelMode,
+  resource: TResource,
+  resourcesByMode: Partial<Record<TravelMode, readonly TResource[]>>
+): void => {
+  const supportedResources = resourcesByMode[mode];
+  if (supportedResources === undefined) {
+    throw new IndiaMapsError(
+      `Mappls ${feature} does not support travel mode '${mode}'.`,
+      'UNSUPPORTED_ERROR'
+    );
+  }
+  if (!supportedResources.includes(resource)) {
+    throw new IndiaMapsError(
+      `Mappls ${feature} does not support resource '${resource}' with mode '${mode}'. Supported resources: ${supportedResources.join(', ')}.`,
+      'INVALID_INPUT_ERROR'
+    );
+  }
+};
+
+const assertMapplsOptimizerOptions = (
+  options?: RouteOptimizerOptions
+): void => {
+  const roundTrip = options?.roundTrip ?? true;
+  const source = options?.source ?? 'any';
+  const destination = options?.destination ?? 'any';
+  const validRoundTrip =
+    roundTrip &&
+    ((source === 'first' &&
+      (destination === 'last' || destination === 'any')) ||
+      (source === 'any' && (destination === 'last' || destination === 'any')));
+  const validOneWayTrip =
+    !roundTrip && source === 'first' && destination === 'last';
+
+  if (!validRoundTrip && !validOneWayTrip) {
+    throw new IndiaMapsError(
+      "Mappls route optimization supports roundTrip=true with source 'first' or 'any' and destination 'last' or 'any', or roundTrip=false with source 'first' and destination 'last'.",
+      'INVALID_INPUT_ERROR'
+    );
+  }
+};
 
 const sumLegMetric = (legs: Raw[], key: string): number | undefined => {
   let total = 0;
@@ -136,11 +216,11 @@ const toMapplsMode = (mode: TravelMode): string => {
     case 'driving':
     case 'walking':
     case 'biking':
+    case 'trucking':
       return mode;
     case 'auto':
-    case 'trucking':
       throw new IndiaMapsError(
-        `Mappls routing supports 'driving', 'walking' and 'biking'; '${mode}' is not available. Use provider 'ola' for 'auto' or pick a supported mode.`,
+        "Mappls routing does not support 'auto'. Use provider 'ola' or choose 'driving', 'walking', 'biking' or 'trucking'.",
         'UNSUPPORTED_ERROR'
       );
   }
@@ -154,8 +234,9 @@ const serializeOlaOverview = (overview?: OverviewLevel): string | undefined => {
   return overview === false ? 'false' : overview;
 };
 
-const serializeMapplsOverview = (overview?: OverviewLevel): string | boolean =>
-  overview === undefined ? true : overview;
+const serializeMapplsOverview = (
+  overview?: OverviewLevel
+): OverviewLevel | undefined => overview;
 
 /**
  * Routing API: directions, distance matrix and route optimization across
@@ -167,9 +248,9 @@ export class RoutingApi extends BaseApi {
    * `waypoints`.
    *
    * @throws {@linkcode IndiaMapsError} with code `'INVALID_INPUT_ERROR'` when
-   * Ola Maps receives more than 25 waypoints, or `'UNSUPPORTED_ERROR'` for a
-   * mode the configured provider cannot route; also on configuration, network
-   * or API failure.
+   * Ola Maps receives more than 25 waypoints or a Mappls resource does not
+   * support the selected mode; `'UNSUPPORTED_ERROR'` when the provider cannot
+   * route the selected mode; also on configuration, network or API failure.
    */
   async getDirections(
     origin: LatLngInput,
@@ -185,6 +266,12 @@ export class RoutingApi extends BaseApi {
       const resource = options?.trafficMetadata
         ? 'route_traffic'
         : (options?.resource ?? 'route_adv');
+      assertMapplsResourceSupportsMode(
+        'directions',
+        mode,
+        resource,
+        MAPPLS_DIRECTION_RESOURCES
+      );
       const response = await this.request<Raw>(
         `/route/direction/${resource}/${toMapplsMode(mode)}/${geopositions}`,
         {
@@ -234,9 +321,10 @@ export class RoutingApi extends BaseApi {
    * Returns travel distance and duration grids from every origin to every
    * destination.
    *
-   * @throws {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'` for a
-   * mode the configured provider cannot route; also on configuration, network
-   * or API failure.
+   * @throws {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'` when
+   * the provider does not offer the selected mode, or `'INVALID_INPUT_ERROR'`
+   * when a Mappls distance-matrix resource does not support the selected mode;
+   * also on configuration, network or API failure.
    */
   async getDistanceMatrix(
     origins: LatLngInput[],
@@ -248,6 +336,12 @@ export class RoutingApi extends BaseApi {
 
     if (this.provider === 'mappls') {
       const resource = options?.resource ?? 'distance_matrix';
+      assertMapplsResourceSupportsMode(
+        'distance matrix',
+        mode,
+        resource,
+        MAPPLS_DISTANCE_MATRIX_RESOURCES
+      );
       const geopositions = joinLngLat([...origins, ...destinations]);
       const response = await this.request<Raw>(
         `/route/dm/${resource}/${toMapplsMode(mode)}/${geopositions}`,
@@ -283,9 +377,11 @@ export class RoutingApi extends BaseApi {
    * Optimizes the visiting order of `locations`.
    *
    * @throws {@linkcode IndiaMapsError} with code `'INVALID_INPUT_ERROR'` when
-   * Ola Maps receives more than 25 locations or an unsupported `source` /
-   * `destination` anchor, or `'UNSUPPORTED_ERROR'` for a mode the configured
-   * provider cannot route; also on configuration, network or API failure.
+   * Ola Maps receives more than 25 locations, an anchor is unsupported, a
+   * Mappls resource does not support the selected mode, or the Mappls
+   * `roundTrip`/`source`/`destination` combination is unsupported;
+   * `'UNSUPPORTED_ERROR'` when the provider cannot route the selected mode;
+   * also on configuration, network or API failure.
    */
   async routeOptimizer(
     locations: LatLngInput[],
@@ -296,7 +392,14 @@ export class RoutingApi extends BaseApi {
 
     if (this.provider === 'mappls') {
       const geopositions = joinLngLat(locations);
-      const resource = options?.resource ?? 'trip_optimization_eta';
+      const resource = options?.resource ?? 'trip_optimization';
+      assertMapplsResourceSupportsMode(
+        'route optimization',
+        mode,
+        resource,
+        MAPPLS_OPTIMIZATION_RESOURCES
+      );
+      assertMapplsOptimizerOptions(options);
       const response = await this.request<Raw>(
         `/route/optimization/${resource}/${toMapplsMode(mode)}/${geopositions}`,
         {

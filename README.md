@@ -195,8 +195,8 @@ Version 0.3.0 redesigns the public API. The most common changes:
 - **Methods return domain types directly.** The `ApiResponse` / `PaginatedResponse` envelopes were removed. For example, `autocomplete` now resolves to `AutocompleteSuggestion[]`, and `geocode` to `GeocodeResult[]`.
 - **Positional, typed signatures.** `geocode(address, options?)`, `reverseGeocode(location, options?)` and `placeDetails(placeId, options?)` take their primary input as a positional argument. Coordinate inputs accept `LatLng`, `{ latitude, longitude }`, `[lng, lat]` or `'lat,lng'` strings (`LatLngInput`).
 - **camelCase option names.** `rankby` → `rankBy`, `strictbounds` → `strictBounds`, `roundtrip` → `roundTrip`, `traffic_metadata` → `trafficMetadata`, `routepreference` → `routePreference`.
-- **Closed unions.** `TravelMode` is `'driving' | 'walking' | 'biking' | 'trucking'`, and `overview` is `'full' | 'simplified' | false`.
-- **Single error type.** All failures throw `IndiaMapsError` with a `code` of `'CONFIGURATION_ERROR' | 'NETWORK_ERROR' | 'API_ERROR' | 'PARSE_ERROR' | 'UNSUPPORTED_ERROR'`.
+- **Closed unions.** `TravelMode` is `'driving' | 'walking' | 'biking' | 'auto' | 'trucking'`, and `overview` is `'full' | 'simplified' | false`.
+- **Single error type.** All failures throw `IndiaMapsError` with a `code` of `'CONFIGURATION_ERROR' | 'NETWORK_ERROR' | 'API_ERROR' | 'PARSE_ERROR' | 'UNSUPPORTED_ERROR' | 'INVALID_INPUT_ERROR'`.
 - **Style presets.** `MAP_STYLES` exports well-known Ola Maps style names; `MapView` uses `styleName` (default `default-light-standard`) instead of `accessToken`-keyed style resolution.
 
 ### Migrating from 0.4.x
@@ -277,9 +277,14 @@ Mappls behaviour is unchanged.
   results now normalize to `{ originalIndex, speedLimit }` (km/h), matching
   the documented response instead of the old `placeId`/`units` shape.
   `SnappedPoint` gained `snappedType` (`Nearest`/`Match`/`NoSegment`).
-- **Travel modes.** `TravelMode` gained `'auto'` (Ola) and modes are validated
-  per provider: `'trucking'` throws on Ola; `'auto'`/`'trucking'` throw on
-  Mappls; `'biking'` is sent as `bike` on routing endpoints.
+- **Travel modes.** `TravelMode` gained `'auto'` (Ola). Ola rejects
+  `'trucking'`; Mappls supports `'trucking'` and rejects `'auto'`. Mappls also
+  validates travel mode/resource combinations per endpoint; see
+  [Mappls provider notes](./docs/mappls.md).
+- **Mappls optimizer defaults and validation.** The default resource is now
+  `trip_optimization` (no traffic); select an ETA/traffic resource explicitly
+  when appropriate. `roundTrip: false` requires `source: 'first'` and
+  `destination: 'last'`, otherwise the client throws `INVALID_INPUT_ERROR`.
 - **Closed invalid options.** `RoutePreference` dropped `'eco'` (not accepted);
   `DistanceMatrixOptions.language` and `TextSearchOptions.language` were
   removed (endpoints accept no language parameter); `NearbySearchOptions`

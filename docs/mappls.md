@@ -22,20 +22,44 @@ Auth is the `access_token` query parameter, not `api_key`.
 
 ## Endpoints
 
+These are the paths the current client constructs:
+
 | Capability | Path |
 | --- | --- |
 | Autocomplete | `/search/places/autosuggest/json` |
 | Geocode | `/search/address/geocode` |
 | Reverse geocode | `/search/address/rev-geocode` |
-| Place details | `/O2O/entity/place-details/{eLoc}` |
-| Nearby search | `/search/places/nearby/json` |
-| Text search | `/search/places/textsearch/json` |
+| Place details | `/apis/O2O/entity/{eLoc}` |
+| Nearby search | `/api/places/nearby/json` |
+| Text search | `/api/places/textsearch/json` |
 | Directions | `/route/direction/{resource}/{profile}/{geopositions}` |
 | Distance matrix | `/route/dm/{resource}/{profile}/{geopositions}` |
 | Route optimizer | `/route/optimization/{resource}/{profile}/{coordinates}` |
 | Snap to road | `/route/movement/snapToRoad` |
 | Elevation | `/map/utils/elevation` |
 | Static map | `/map/raster_tile/still_image` |
+
+### Search and place-details path generations
+
+Mappls publishes overlapping REST contracts. Its current endpoint reference
+lists `/api/places/nearby/json`, `/api/places/textsearch/json`, and
+`/apis/O2O/entity/{eLoc}`, but labels those records **legacy-source evidence**;
+their examples use `atlas.mapmyindia.com` / `explore.mapmyindia.com` and OAuth
+Bearer authentication. The canonical REST repository documents newer
+`/search/places/...` and `/O2O/entity/place-details/{eLoc}` routes using
+`search.mappls.com` / `place.mappls.com` with `access_token` authentication.
+
+The package currently retains the paths in the table above with its configured
+Mappls hosts and query-token authentication. Do not change one path in isolation
+from its host and authentication generation; verify the exact contract and
+entitlement for the target Mappls account before migrating. The path segment by
+itself is therefore not enough evidence to call the current request valid or
+invalid end-to-end.
+
+Sources: [Mappls endpoint reference](https://mapplsapi.com/api-reference?family=core-location),
+[canonical Nearby REST guide](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-maps-near-by-api-example/Readme.md),
+[canonical Text Search REST guide](https://github.com/mappls-api/mappls-rest-apis/blob/main/mappls-textsearch-api/readme.md),
+and [Place Detail API reference](https://mapplsapi.com/api-reference/core-location-get-apis-o2o-entity-eloc-place-detail-api).
 
 ## Differences from Ola Maps
 
@@ -57,8 +81,10 @@ Mappls supports `trucking`, which Ola Maps does not. It does **not** support
 
 ### Profile × resource matrix
 
-Mappls restricts which resources each profile may use. Requesting an
-unsupported combination returns an error.
+Mappls restricts which resources each profile may use. The client validates
+these combinations before making a request: unsupported profiles throw
+`UNSUPPORTED_ERROR`, while a profile/resource mismatch throws
+`INVALID_INPUT_ERROR`.
 
 **Directions**
 
@@ -87,9 +113,61 @@ unsupported combination returns an error.
 | `walking` | `trip_optimization` |
 | `trucking` | `trip_optimization`, `trip_optimization_eta` |
 
+The route optimizer defaults to `trip_optimization`, which is the neutral
+no-traffic resource and works with `walking`. Choose an ETA/traffic resource
+explicitly when you need it and the selected profile supports it.
+
 `route_eta`, `route_traffic`, `trip_optimization_eta` and
 `trip_optimization_traffic` are **India only**. The `biking`, `walking` and
 `trucking` profiles do not accept `region` or `rtype`.
+
+### Routing examples
+
+```ts
+import { IndiaMapsClient, IndiaMapsError } from 'react-native-india-maps';
+
+const client = new IndiaMapsClient({
+  provider: 'mappls',
+  accessToken: 'YOUR_MAPPLS_TOKEN',
+});
+
+// Trucking is supported for directions and distance matrices.
+const directions = await client.routing.getDirections('12.9,77.6', '13.0,77.7', {
+  mode: 'trucking',
+});
+const matrix = await client.routing.getDistanceMatrix(['12.9,77.6'], ['13.0,77.7'], {
+  mode: 'trucking',
+});
+
+// The default optimizer resource is trip_optimization (no traffic),
+// which supports walking.
+const walkingTrip = await client.routing.routeOptimizer(
+  ['12.9,77.6', '13.0,77.7'],
+  { mode: 'walking' }
+);
+
+// For a one-way trip, Mappls requires first -> last anchors.
+const oneWayTrip = await client.routing.routeOptimizer(
+  ['12.9,77.6', '13.0,77.7'],
+  { roundTrip: false, source: 'first', destination: 'last' }
+);
+
+// Invalid combinations are rejected locally, before a provider request.
+try {
+  await client.routing.routeOptimizer(['12.9,77.6', '13.0,77.7'], {
+    roundTrip: false,
+  });
+} catch (error) {
+  if (error instanceof IndiaMapsError && error.code === 'INVALID_INPUT_ERROR') {
+    console.error(error.message);
+  } else {
+    throw error;
+  }
+}
+```
+
+Set `resource: 'trip_optimization_eta'` explicitly for driving optimization
+with Mappls live-traffic ETAs; this resource is India-only.
 
 ### Route optimizer: roundtrip / source / destination
 
@@ -106,7 +184,8 @@ accepted:
 
 So `roundTrip: false` only works together with `source: 'first'` and
 `destination: 'last'`. Server defaults are `roundtrip=true`, `source=any`,
-`destination=any`.
+`destination=any`; the client rejects unsupported combinations locally with
+`IndiaMapsError` code `INVALID_INPUT_ERROR`.
 
 ### Overview levels
 
@@ -115,11 +194,16 @@ the parameter requests the default; sending `true` is not valid.
 
 ### Response envelopes
 
-The reverse-geocode endpoint returns `results` as a **single object**, not an
-array. Place details returns a **flat object** with `eloc`, `name`, `address`
-and `type` at the top level — there is no `results` wrapper.
+The reverse-geocode endpoint returns `results` as an **array** in Mappls'
+example response, and the published React Native SDK's
+`ReverseGeoCodeModel.ts` also declares an array. Place details returns a **flat
+object** with `eloc`, `name`, `address` and `type` at the top level — there is
+no `results` wrapper.
 
 ### Limits
+
+These are provider-side limits. The client does not prevalidate all of them;
+Mappls may reject an out-of-range request with an API error.
 
 | Endpoint | Limit |
 | --- | --- |
@@ -148,8 +232,10 @@ distance matrix and snap-to-road. It defaults to `IND`.
 Valid values are ISO country codes listed in `countryISO.md` in the
 [Mappls REST API repository](https://github.com/mappls-api/mappls-rest-apis).
 
-> `region` is not yet exposed as an option on this package's public types. For
-> requests outside India you currently need to set it yourself.
+> `region` is not exposed on this package's public API. Requests that require
+> an explicit non-India region cannot currently be configured through this
+> client; use the Mappls REST API directly with the required `region` until the
+> SDK adds a typed option.
 
 ## Still-image endpoint
 

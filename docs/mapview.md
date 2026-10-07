@@ -67,10 +67,10 @@ MapLibre style object or a third-party raster style in that case:
 
 ```tsx
 // Mappls has no public vector style endpoint — supply your own style.
-<MapView style={myOwnStyleObject} style={{ flex: 1 }} />
+<MapView mapStyle={myOwnStyleObject} style={{ flex: 1 }} />
 ```
 
-For static images, requesting `format: 'jpeg'` under Mappls silently returns
+For static images, requesting `format: 'jpg'` under Mappls silently returns
 PNG, because `/map/raster_tile/still_image` only emits 8-bit PNG.
 
 ## Available styles

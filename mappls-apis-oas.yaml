@@ -9,18 +9,19 @@ info:
 
     ## Provenance
 
-    Every path, parameter, enum, limit and response envelope below was
-    transcribed from the canonical Mappls documentation repository
-    ([`mappls-api/mappls-rest-apis`](https://github.com/mappls-api/mappls-rest-apis))
-    and independently corroborated against the published
+    Paths describe the URL construction currently used by
+    `react-native-india-maps`; parameters, limits, resource constraints and
+    response shapes are compiled from Mappls' official REST documentation and
+    checked against the published
     [`mappls-map-react-native`](https://www.npmjs.com/package/mappls-map-react-native)
-    package (v2.0.3, published 2026-07-28), whose open-source
-    `src/modules/restApi/` layer exposes the vendor's request/response models
-    and criteria constants.
+    package (v2.0.3). Its open-source `src/modules/restApi/` layer exposes
+    request/response models and criteria constants, while its native bridge
+    delegates network work to vendor SDK binaries.
 
-    Where the published SDK wraps a request in an options object and delegates
-    to the closed-source native SDK, this file reflects the REST contract that
-    the native SDK implements.
+    Mappls publishes overlapping current and legacy endpoint references. Where
+    those references disagree about route paths or response shapes, the
+    operation description identifies the discrepancy instead of treating one
+    source as definitive.
 
     ## Scope
 
@@ -214,11 +215,9 @@ paths:
         Converts coordinates into the closest matching address and nearest
         popular landmark.
 
-        **Response envelope:** `results` is a single object, not an array. The
-        published SDK's `ReverseGeoCodeModel.ts` types it as
-        `results?: Array<Place>`, but that is the SDK's own convenience type —
-        the REST endpoint documented by Mappls returns an object, and clients
-        must tolerate both shapes.
+        **Response envelope:** `results` is an array in Mappls' official sample
+        response. The published SDK's `ReverseGeoCodeModel.ts` independently
+        types it as `Array<Place>`. The client normalizes that array.
       x-sdk:
         clientMethod: RestApi.reverseGeocode
         npmPackage: mappls-map-react-native@2.0.3
@@ -252,11 +251,9 @@ paths:
                   responseCode: { type: integer, example: 200 }
                   version: { type: string, example: 211.19 }
                   results:
-                    description: A single address object.
-                    oneOf:
-                      - $ref: '#/components/schemas/ReverseGeocodeResult'
-                      - type: array
-                        items: { $ref: '#/components/schemas/ReverseGeocodeResult' }
+                    description: Address results returned by reverse geocoding.
+                    type: array
+                    items: { $ref: '#/components/schemas/ReverseGeocodeResult' }
         '204': { $ref: '#/components/responses/NoResults' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -266,7 +263,7 @@ paths:
         '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
-  /O2O/entity/place-details/{eLoc}:
+  /apis/O2O/entity/{eLoc}:
     get:
       tags: [Places]
       operationId: placesPlaceDetails
@@ -275,14 +272,17 @@ paths:
         Retrieves detailed information for a place identified by its 6-character
         eLoc (`mapplsPin`).
 
-        **Host:** `place.mappls.com`. **Response:** a flat object with
-        `eloc`, `name`, `address` and `type` at the top level — there is no
-        `results` envelope. Confirmed by the published SDK's
-        `PlaceDetailResponse.ts`, which declares `mapplsPin`, `latitude`,
-        `longitude`, `placeName` and `address` as top-level fields.
+        The Mappls endpoint reference lists `/apis/O2O/entity/{eLoc}` and
+        labels it legacy-source evidence. Its sample uses a different legacy
+        host and OAuth bearer authentication; this client retains the path on
+        `place.mappls.com` with the package's configured `access_token` scheme.
+        Verify the path/host/auth combination against the target account before
+        changing it.
 
-        Some accounts retain the legacy `/apis/O2O/entity/{eLoc}` alias; this
-        package targets the current path.
+        **Response:** a flat object with `eloc`, `name`, `address` and `type` at
+        the top level — there is no `results` envelope. The published SDK's
+        `PlaceDetailResponse.ts` independently declares place fields at the
+        top level.
       x-sdk:
         clientMethod: RestApi.placeDetail
         npmPackage: mappls-map-react-native@2.0.3
@@ -307,7 +307,7 @@ paths:
         '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
-  /search/places/nearby/json:
+  /api/places/nearby/json:
     get:
       tags: [Places]
       operationId: placesNearbySearch
@@ -318,6 +318,12 @@ paths:
 
         `keywords` is **required**. `pod` overrides `keywords` when both are
         supplied.
+
+        The Mappls endpoint reference lists this route as legacy-source
+        evidence (with an Atlas host / OAuth example); the canonical REST repo
+        documents `/search/places/nearby/json` with the current Mappls host and
+        query-token authentication. The package currently retains the path
+        below. Verify the full host/path/auth combination for the account.
       x-sdk:
         clientMethod: RestApi.nearby
         npmPackage: mappls-map-react-native@2.0.3
@@ -398,7 +404,7 @@ paths:
         '500': { $ref: '#/components/responses/InternalError' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
-  /search/places/textsearch/json:
+  /api/places/textsearch/json:
     get:
       tags: [Places]
       operationId: placesTextSearch
@@ -409,6 +415,12 @@ paths:
 
         Returns `suggestedLocations`; user-contributed results appear under
         `userAddedLocations`.
+
+        The Mappls endpoint reference lists this route as legacy-source
+        evidence (with an Atlas host / OAuth example); the canonical REST repo
+        documents `/search/places/textsearch/json` with the current Mappls host
+        and query-token authentication. The package currently retains the path
+        below. Verify the full host/path/auth combination for the account.
       parameters:
         - $ref: '#/components/parameters/AccessToken'
         - $ref: '#/components/parameters/Region'
@@ -446,7 +458,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /route/direction/{resource}/{profile}/{geopositions}:
-    post:
+    get:
       tags: [Routing]
       operationId: routingDirections
       summary: Directions
@@ -617,7 +629,7 @@ paths:
         '503': { $ref: '#/components/responses/Unavailable' }
 
   /route/optimization/{resource}/{profile}/{coordinates}:
-    post:
+    get:
       tags: [Routing]
       operationId: routingRouteOptimization
       summary: Route optimization
@@ -650,6 +662,8 @@ paths:
         | `false`   | `first` | `last`      |
 
         Server defaults are `roundtrip=true`, `source=any`, `destination=any`.
+        The package validates these constraints before sending the request and
+        rejects unsupported combinations with `INVALID_INPUT_ERROR`.
       parameters:
         - $ref: '#/components/parameters/AccessToken'
         - name: resource

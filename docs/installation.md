@@ -8,7 +8,7 @@ bun add react-native-india-maps @maplibre/maplibre-react-native@^11.5.0
 
 - React `>=19.2.0`
 - React Native `>=0.83.0`
-- `@maplibre/maplibre-react-native` `>=11.2.0` (currently on `11.5.0`)
+- `@maplibre/maplibre-react-native` `>=11.2.0` (latest stable `11.5.0`, checked 2026-10-07)
 - Expo SDK 55+ development build or bare React Native app
 - React Native New Architecture enabled
 - Ola Maps API key or Mappls access token
@@ -16,7 +16,8 @@ bun add react-native-india-maps @maplibre/maplibre-react-native@^11.5.0
 ## Staying up to date
 
 `@maplibre/maplibre-react-native` is a **peer dependency**, so your app controls
-the installed version. Check for updates with:
+the installed version. The npm `latest` dist-tag resolved to `11.5.0` when
+checked on 2026-10-07. Check for updates with:
 
 ```sh
 bun outdated @maplibre/maplibre-react-native

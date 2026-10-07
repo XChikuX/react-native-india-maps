@@ -6,8 +6,9 @@ import type { LatLngInput, LngLat } from './common';
  * - Ola Maps supports `'driving'`, `'walking'`, `'biking'` (sent as `bike`)
  *   and `'auto'`; `'trucking'` throws an
  *   {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'`.
- * - Mappls supports `'driving'`, `'walking'` and `'biking'`; `'auto'` and
- *   `'trucking'` throw the same error.
+ * - Mappls supports `'driving'`, `'walking'`, `'biking'` and `'trucking'`;
+ *   `'auto'` throws the same error. Mappls walking is unavailable for distance
+ *   matrices; resource compatibility also depends on the selected endpoint.
  *
  * @see {@linkcode RoutingApi.getDirections}
  */
@@ -193,7 +194,7 @@ export type DistanceMatrixResult = {
   durations: number[][];
 };
 
-/** Mappls route-optimizer resource variant. */
+/** Mappls route-optimizer resource variant. The neutral default is `trip_optimization`. */
 export type MapplsOptimizationResource =
   'trip_optimization' | 'trip_optimization_eta' | 'trip_optimization_traffic';
 
@@ -204,17 +205,20 @@ export type RouteOptimizerOptions = {
 
   /**
    * Fixes the start of the optimized trip. Ola Maps accepts `'first'` and
-   * `'any'` only (default `'first'`).
+   * `'any'` (default `'first'`); Mappls defaults to `'any'`.
    */
   source?: 'first' | 'last' | 'any';
 
   /**
    * Fixes the end of the optimized trip. Ola Maps accepts `'last'` and
-   * `'any'` only (default `'last'`).
+   * `'any'` (default `'last'`); Mappls defaults to `'any'`.
    */
   destination?: 'first' | 'last' | 'any';
 
-  /** Returns to the starting point after the last stop. */
+  /**
+   * Returns to the starting point after the last stop. On Mappls, `false` is
+   * supported only with `source: 'first'` and `destination: 'last'`.
+   */
   roundTrip?: boolean;
 
   /** Includes turn-by-turn steps in returned routes. Ola Maps default: `true`. */
@@ -234,7 +238,7 @@ export type RouteOptimizerOptions = {
   /** Ola Maps routing preference. */
   routePreference?: RoutePreference;
 
-  /** Mappls resource variant. */
+  /** Mappls resource variant. Defaults to `trip_optimization` (no traffic). */
   resource?: MapplsOptimizationResource;
 };
 

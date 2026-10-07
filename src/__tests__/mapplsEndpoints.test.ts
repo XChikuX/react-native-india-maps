@@ -87,13 +87,35 @@ describe('Mappls request construction', () => {
     expect(requestedUrl()).toContain('location=28.45%2C77.43');
   });
 
-  it('uses the route_adv resource for directions', async () => {
+  it('uses the route_adv resource for directions and omits overview by default', async () => {
     const client = mapplsClient();
     await client.routing.getDirections('12.9,77.6', '13.05,77.7');
     expect(requestedUrl()).toContain(
       'https://route.mappls.com/route/direction/route_adv/driving/77.6,12.9;77.7,13.05'
     );
+    expect(new URL(requestedUrl()).searchParams.has('overview')).toBe(false);
     expect(requestedUrl()).toContain('access_token=test-token');
+  });
+
+  it('supports trucking directions on Mappls', async () => {
+    const client = mapplsClient();
+    await client.routing.getDirections('12.9,77.6', '13.05,77.7', {
+      mode: 'trucking',
+    });
+    expect(requestedUrl()).toContain(
+      '/route/direction/route_adv/trucking/77.6,12.9;77.7,13.05'
+    );
+  });
+
+  it('rejects Mappls directions resources that do not support the profile', async () => {
+    const client = mapplsClient();
+    await expect(
+      client.routing.getDirections('12.9,77.6', '13.05,77.7', {
+        mode: 'walking',
+        resource: 'route_eta',
+      })
+    ).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT_ERROR' }));
+    expect(g.fetch).not.toHaveBeenCalled();
   });
 
   it('uses the distance-matrix endpoint with sources and destinations', async () => {
@@ -106,12 +128,87 @@ describe('Mappls request construction', () => {
     expect(requestedUrl()).toContain('destinations=1');
   });
 
-  it('uses the optimization endpoint for the route optimizer', async () => {
+  it('supports trucking distance matrices on Mappls', async () => {
+    const client = mapplsClient();
+    await client.routing.getDistanceMatrix(['12.9,77.6'], ['13.0,77.7'], {
+      mode: 'trucking',
+    });
+    expect(requestedUrl()).toContain(
+      '/route/dm/distance_matrix/trucking/77.6,12.9;77.7,13'
+    );
+  });
+
+  it('rejects walking distance matrices on Mappls', async () => {
+    const client = mapplsClient();
+    await expect(
+      client.routing.getDistanceMatrix(['12.9,77.6'], ['13.0,77.7'], {
+        mode: 'walking',
+      })
+    ).rejects.toThrow(expect.objectContaining({ code: 'UNSUPPORTED_ERROR' }));
+    expect(g.fetch).not.toHaveBeenCalled();
+  });
+
+  it('uses the neutral optimization resource and omits overview by default', async () => {
     const client = mapplsClient();
     await client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7']);
     expect(requestedUrl()).toContain(
-      'https://route.mappls.com/route/optimization/trip_optimization_eta/driving/77.6,12.9;77.7,13.05'
+      'https://route.mappls.com/route/optimization/trip_optimization/driving/77.6,12.9;77.7,13.05'
     );
+    expect(new URL(requestedUrl()).searchParams.has('overview')).toBe(false);
+  });
+
+  it('supports walking with the default Mappls optimizer resource', async () => {
+    const client = mapplsClient();
+    await client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+      mode: 'walking',
+    });
+    expect(requestedUrl()).toContain(
+      '/route/optimization/trip_optimization/walking/77.6,12.9;77.7,13.05'
+    );
+  });
+
+  it('supports trucking with the default Mappls optimizer resource', async () => {
+    const client = mapplsClient();
+    await client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+      mode: 'trucking',
+    });
+    expect(requestedUrl()).toContain(
+      '/route/optimization/trip_optimization/trucking/77.6,12.9;77.7,13.05'
+    );
+  });
+
+  it('rejects optimizer resources that do not support the Mappls profile', async () => {
+    const client = mapplsClient();
+    await expect(
+      client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+        mode: 'walking',
+        resource: 'trip_optimization_eta',
+      })
+    ).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT_ERROR' }));
+    expect(g.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid Mappls optimizer roundtrip anchors before requesting', async () => {
+    const client = mapplsClient();
+    await expect(
+      client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+        roundTrip: false,
+      })
+    ).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT_ERROR' }));
+    expect(g.fetch).not.toHaveBeenCalled();
+  });
+
+  it('accepts the supported non-roundtrip Mappls optimizer combination', async () => {
+    const client = mapplsClient();
+    await client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+      roundTrip: false,
+      source: 'first',
+      destination: 'last',
+    });
+    const params = new URL(requestedUrl()).searchParams;
+    expect(params.get('roundtrip')).toBe('false');
+    expect(params.get('source')).toBe('first');
+    expect(params.get('destination')).toBe('last');
   });
 
   it('uses the movement snap-to-road endpoint with a pts parameter', async () => {
