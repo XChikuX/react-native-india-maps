@@ -119,10 +119,11 @@ const mapplsClient = new IndiaMapsClient({
 - Place Details
 - Nearby Search
 - Text Search
+- Address Validation (Ola Maps)
 
 ### Routing
 
-- Directions (driving, walking, biking)
+- Directions (driving, walking, biking, auto; trucking on Mappls)
 - Distance Matrix
 - Route Optimizer
 
@@ -130,7 +131,7 @@ const mapplsClient = new IndiaMapsClient({
 
 - Snap to Road
 - Nearest Roads
-- Speed Limits
+- Speed Limits (km/h readings keyed by input index)
 
 ### Elevation
 
@@ -145,7 +146,7 @@ const mapplsClient = new IndiaMapsClient({
 ### Tiles
 
 - Vector tile style URLs for MapLibre
-- Static map image URLs
+- Static map image URLs (markers, path overlays, png/jpg)
 - Request transform helper for API key injection
 
 ## Base URL overrides
@@ -221,7 +222,8 @@ Version 0.5.0 removes previously-deprecated aliases. Update your imports:
 
 Version 0.6.0 corrects the Mappls endpoints to the hosts in the current official
 documentation (the previous release used legacy `atlas.mappls.com`/`apis.mappls.com`
-paths that no longer resolve). No Ola Maps behaviour changes.
+paths that no longer resolve). See “Migrating from 0.6.x” for the Ola Maps
+corrections in 0.7.0.
 
 - Mappls requests now target the current public hosts: `search.mappls.com` for
   autosuggest, geocoding, reverse geocoding, nearby and text search,
@@ -238,6 +240,58 @@ paths that no longer resolve). No Ola Maps behaviour changes.
 - `AutocompleteOptions.zoom`, `TextSearchOptions.zoom`/`hyperLocal`/`pod`/`tokenizeAddress`
   and `NearbySearchOptions.richData` were removed because the endpoints accept no
   such parameters.
+
+### Migrating from 0.6.x
+
+Version 0.7.0 corrects the Ola Maps integration against the current official
+OpenAPI specification (`maps.olakrutrim.com/openapi/ola-maps-apis-oas.yaml`);
+0.6.x used stale endpoint paths and parameter names that no longer resolve.
+Mappls behaviour is unchanged.
+
+- **Routing requests rebuilt.** Directions and route optimization are now
+  `POST` requests to `/routing/v1/directions` and `/routing/v1/routeOptimizer`
+  with query parameters (`origin`, `destination`, `waypoints`, `locations`,
+  `round_trip`, …); the distance matrix is `GET /routing/v1/distanceMatrix`.
+  The legacy `/routing/v1/directions/{mode}/{coords}` path style is gone.
+  Response normalizers now accept both the current Google-style payloads
+  (`status`, `overview_polyline`, `legs`-totalled routes, `waypoint_order`) and
+  the legacy OSRM-style payloads.
+- **Elevation moved.** `GET/POST /places/v1/elevation` replaces
+  `/elevation/v1/getElevation`. `getElevation` now takes one coordinate
+  argument: `getElevation('12.9,77.6')` instead of `getElevation(12.9, 77.6)`.
+  Multi lookups cap at 25 coordinates.
+- **Geofencing moved.** Fences now live at `/places/v1/geofence` (CRUD) and
+  `/places/v1/geofences` (list with `projectId`, `page`, `size`). `create` and
+  `update` return `GeofenceWriteResult` (`fenceId`, `message`); `update` takes
+  the full `GeofenceData` (provider updates are whole-object replacements);
+  `GeofenceListOptions` renamed `limit` to `pageSize`; `checkStatus` results
+  expose `isInside`; geofences carry `status` (`active`/`inactive`) and no
+  longer expose `metadata`/`createdAt`/`updatedAt`.
+- **Static map URLs rebuilt.** Ola static images use the path-embedded form
+  `/tiles/v1/styles/{style}/static/{lon},{lat},{zoom}/{width}x{height}.{format}`
+  with `marker`/`path` query overlays. `StaticMapOptions` gains `format`
+  (`'png' | 'jpg'`) and `path` (polyline overlay).
+- **Roads params corrected.** `snapToRoad` sends `enhancePath` (was never
+  honored as `interpolate`); `nearestRoads` sends the required snap-validation
+  `mode` (default `driving`); `speedLimits` gained a `snapStrategy` option and
+  results now normalize to `{ originalIndex, speedLimit }` (km/h), matching
+  the documented response instead of the old `placeId`/`units` shape.
+  `SnappedPoint` gained `snappedType` (`Nearest`/`Match`/`NoSegment`).
+- **Travel modes.** `TravelMode` gained `'auto'` (Ola) and modes are validated
+  per provider: `'trucking'` throws on Ola; `'auto'`/`'trucking'` throw on
+  Mappls; `'biking'` is sent as `bike` on routing endpoints.
+- **Closed invalid options.** `RoutePreference` dropped `'eco'` (not accepted);
+  `DistanceMatrixOptions.language` and `TextSearchOptions.language` were
+  removed (endpoints accept no language parameter); `NearbySearchOptions`
+  `rankBy` values are now `'popular' | 'distance'` and gained `limit` (5-50)
+  and `withCentroid`; the Ola nearby-search request no longer sends `keyword`
+  (Mappls-only).
+- **Address validation.** `PlacesApi.addressValidation` uses the dedicated
+  `/places/v1/addressvalidation` endpoint on Ola and returns
+  `AddressValidationResult` (`isAddressValid`, `validatedAddress`); Mappls
+  throws `UNSUPPORTED_ERROR` (use `geocode()` there).
+- **New error code.** `IndiaMapsError` can now carry `'INVALID_INPUT_ERROR'`
+  for arguments outside provider limits (e.g. >25 waypoints).
 
 ## Notes
 
