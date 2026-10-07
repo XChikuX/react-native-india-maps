@@ -41,6 +41,7 @@ This package only depends on MapLibre's public surface — `MapView`, `Camera`,
 {
   "expo": {
     "plugins": [
+      "@maplibre/maplibre-react-native",
       [
         "react-native-india-maps",
         {
@@ -53,11 +54,48 @@ This package only depends on MapLibre's public surface — `MapView`, `Camera`,
 }
 ```
 
-The plugin handles:
+The MapLibre plugin configures the native MapLibre integration, including the iOS Podfile setup; keep it alongside this package's plugin. The India Maps plugin handles:
 - Android: `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` permissions (+ `ACCESS_BACKGROUND_LOCATION` if `backgroundLocation: true`)
 - iOS: `NSLocationWhenInUseUsageDescription` (+ `NSLocationAlwaysAndWhenInUseUsageDescription` if `backgroundLocation: true`)
 
 No native SDK configuration files, Maven repositories, or Gradle plugins are needed — MapLibre handles all rendering natively.
+
+## Runtime API credentials
+
+The config plugin only configures native location permissions and usage descriptions. It does not need, read, or write Ola Maps or Mappls credentials. The `.conf` and `.olf` files used by Mappls's native SDK are not used by this package; MapLibre renders the map, while this SDK uses provider credentials for runtime REST requests.
+
+For local Expo development, create a `.env.local` file in your app and provide the credential for the provider you use:
+
+```env
+EXPO_PUBLIC_OLA_MAPS_API_KEY=your-ola-maps-api-key
+# Or, for Mappls:
+EXPO_PUBLIC_MAPPLS_ACCESS_TOKEN=your-mappls-access-token
+```
+
+Pass the statically referenced Expo variable to the client:
+
+```tsx
+import { IndiaMapsClient, IndiaMapsProvider } from 'react-native-india-maps';
+
+const apiKey = process.env.EXPO_PUBLIC_OLA_MAPS_API_KEY;
+if (!apiKey) {
+  throw new Error('Set EXPO_PUBLIC_OLA_MAPS_API_KEY before starting the app.');
+}
+
+const client = new IndiaMapsClient({ apiKey });
+
+export function App() {
+  return (
+    <IndiaMapsProvider client={client}>
+      {/* app screens */}
+    </IndiaMapsProvider>
+  );
+}
+```
+
+For Mappls, use `process.env.EXPO_PUBLIC_MAPPLS_ACCESS_TOKEN` and pass it as `accessToken` with `provider: 'mappls'`. Expo replaces direct `process.env.EXPO_PUBLIC_*` references when bundling; use dot notation rather than dynamic lookups such as `process.env[name]`. Keep `.env.local` out of version control (for example, add `.env*.local` to your app's `.gitignore`).
+
+For EAS Build or EAS Update, define the matching `EXPO_PUBLIC_` variable in the EAS environment used by that build or update. These values are embedded in the application JavaScript bundle and can be inspected by app users: **they are not confidential secrets**. Restrict provider credentials according to the provider's available controls. If a credential must remain private, make provider requests through a backend you control instead of embedding it in a mobile app. See Expo's [environment variable guide](https://docs.expo.dev/guides/environment-variables/) and [EAS environment variable guide](https://docs.expo.dev/eas/environment-variables/).
 
 ## Provider
 

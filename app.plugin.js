@@ -1,8 +1,9 @@
-const { createRunOncePlugin } = require('@expo/config-plugins');
+const { createRunOncePlugin } = require('./plugin/loadConfigPlugins');
 const { withIndiaMaps } = require('./plugin/withIndiaMaps');
+const packageJson = require('./package.json');
 
 module.exports = createRunOncePlugin(
   withIndiaMaps,
-  'react-native-india-maps',
-  '0.5.0'
+  packageJson.name,
+  packageJson.version
 );

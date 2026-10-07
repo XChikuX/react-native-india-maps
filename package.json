@@ -17,6 +17,8 @@
         "default": "./lib/commonjs/index.js"
       }
     },
+    "./app.plugin.js": "./app.plugin.js",
+    "./package.json": "./package.json",
     "./plugin": "./app.plugin.js"
   },
   "files": [
@@ -95,12 +97,16 @@
   },
   "peerDependencies": {
     "@expo/config-plugins": ">=55.0.0",
+    "expo": ">=55.0.0",
     "@maplibre/maplibre-react-native": ">=11.2.0",
     "react": ">=19.2.0",
     "react-native": ">=0.83.0"
   },
   "peerDependenciesMeta": {
     "@expo/config-plugins": {
+      "optional": true
+    },
+    "expo": {
       "optional": true
     },
     "@maplibre/maplibre-react-native": {

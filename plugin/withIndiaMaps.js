@@ -2,7 +2,7 @@ const {
   AndroidConfig,
   withAndroidManifest,
   withInfoPlist,
-} = require('@expo/config-plugins');
+} = require('./loadConfigPlugins');
 
 const DEFAULT_IOS_MESSAGE =
   'Allow $(PRODUCT_NAME) to access your location while using the app.';
@@ -19,7 +19,10 @@ const withLocationPermissions = (config, options) => {
     }
 
     permissions.forEach((permission) => {
-      AndroidConfig.Permissions.addPermission(modConfig.modResults, permission);
+      AndroidConfig.Permissions.ensurePermission(
+        modConfig.modResults,
+        permission
+      );
     });
 
     return modConfig;
