@@ -72,3 +72,18 @@ export function asLngLat(value: unknown): LngLat | undefined {
 export function arrayOf<T = Raw>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
+
+/**
+ * Normalizes a provider value that is either a single object or an array of
+ * objects into an array, e.g. geocoding `copResults` which is a bare object
+ * for single-result lookups and an array otherwise.
+ */
+export function arrayOrSingleOf<T = Raw>(value: unknown): T[] {
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
+  if (value !== null && typeof value === 'object') {
+    return [value as T];
+  }
+  return [];
+}

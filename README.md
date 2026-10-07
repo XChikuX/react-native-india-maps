@@ -94,7 +94,7 @@ The SDK supports two backends:
 | Feature | Ola Maps | Mappls |
 | --- | --- | --- |
 | Auth param | `api_key` | `access_token` |
-| Base URL | `https://api.olamaps.io` | `https://atlas.mappls.com` |
+| Base URL | `https://api.olamaps.io` | `https://search.mappls.com`, `https://route.mappls.com`, `https://sdk.mappls.com` |
 | Map tiles | ✅ Vector tiles | ❌ Not public |
 | Geofencing | ✅ | ❌ Not public |
 
@@ -148,6 +148,32 @@ const mapplsClient = new IndiaMapsClient({
 - Static map image URLs
 - Request transform helper for API key injection
 
+## Base URL overrides
+
+Every endpoint resolves against a base URL that you can override, which is useful for
+corporate proxies or self-hosted gateways. `baseUrl` redirects everything; the
+domain-specific options take precedence over it when set.
+
+```ts
+// Redirect all traffic
+const client = new IndiaMapsClient({ apiKey: 'k', baseUrl: 'https://proxy.internal' });
+
+// Or redirect a single domain
+const client = new IndiaMapsClient({
+  apiKey: 'k',
+  searchBaseUrl: 'https://proxy.internal', // places + geocoding
+  routeBaseUrl: 'https://proxy.internal', // routing, elevation, roads
+  sdkBaseUrl: 'https://proxy.internal', // geofencing
+  tileBaseUrl: 'https://proxy.internal', // styles + static maps
+});
+```
+
+Without overrides, each provider uses its own public hosts. Mappls spreads capabilities
+across `search.mappls.com` (places, geocoding, nearby, text search), `place.mappls.com`
+(place details), `route.mappls.com` (directions, distance matrix, route optimization,
+roads), `sdk.mappls.com` (elevation) and `tile.mappls.com` (static maps), while Ola Maps
+serves everything from `api.olamaps.io`.
+
 ## Map styles
 
 Use the `MAP_STYLES` presets or any provider-specific style name:
@@ -190,6 +216,28 @@ Version 0.5.0 removes previously-deprecated aliases. Update your imports:
 - Replace `getDirectionsBasic` with `getDirections` (no longer an alias)
 - Replace `getDistanceMatrixBasic` with `getDistanceMatrix` (no longer an alias)
 - `RoutingApi.fleetPlanner` has been removed — fleet planning has no public REST API
+
+### Migrating from 0.5.x
+
+Version 0.6.0 corrects the Mappls endpoints to the hosts in the current official
+documentation (the previous release used legacy `atlas.mappls.com`/`apis.mappls.com`
+paths that no longer resolve). No Ola Maps behaviour changes.
+
+- Mappls requests now target the current public hosts: `search.mappls.com` for
+  autosuggest, geocoding, reverse geocoding, nearby and text search,
+  `place.mappls.com` for place details, `route.mappls.com` for directions,
+  distance matrix, route optimization and snap to road, `sdk.mappls.com` for
+  elevation and `tile.mappls.com` for static maps.
+- `DirectionsOptions.resource` for Mappls is now `'route_adv' | 'route_eta' | 'route_traffic'`
+  (default `'route_adv'`); the previous `'route'` value was not a valid resource.
+- `GeofencingApi.list(projectId, options?)` takes `{ page, limit }` instead of
+  two positional numbers.
+- `RoadsApi.nearestRoads(points, options?)` takes `{ radius }` instead of
+  `(points, mode, radius)`; `mode` was never sent to a provider.
+- `RoadsApi.speedLimits(points)` dropped its unused second parameter.
+- `AutocompleteOptions.zoom`, `TextSearchOptions.zoom`/`hyperLocal`/`pod`/`tokenizeAddress`
+  and `NearbySearchOptions.richData` were removed because the endpoints accept no
+  such parameters.
 
 ## Notes
 

@@ -77,18 +77,26 @@ export type IndiaMapsConfig = {
   /** Backend provider. @default 'ola' */
   provider?: MapProvider;
 
-  /** Overrides the default base URL for search and geocoding endpoints. */
+  /**
+   * Global base URL override applied to every endpoint. The domain-specific
+   * overrides below take precedence over it when set.
+   */
   baseUrl?: string;
 
-  /** Overrides the default base URL for places/search endpoints. */
+  /**
+   * Overrides the base URL for places search, geocoding and place-details
+   * endpoints.
+   */
   searchBaseUrl?: string;
 
-  /** Overrides the default base URL for routing, elevation and roads endpoints. */
+  /**
+   * Overrides the base URL for routing, roads and elevation endpoints.
+   */
   routeBaseUrl?: string;
 
-  /** Overrides the default base URL for Ola Maps SDK-only endpoints (geofencing). */
+  /** Overrides the base URL for geofencing endpoints (Ola Maps only). */
   sdkBaseUrl?: string;
 
-  /** Overrides the default base URL for tile style endpoints. */
+  /** Overrides the base URL for tile and static-map endpoints. */
   tileBaseUrl?: string;
 };

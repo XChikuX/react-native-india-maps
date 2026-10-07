@@ -56,6 +56,15 @@ export type Geofence = GeofenceData & {
   updatedAt?: string;
 };
 
+/** Options accepted by {@linkcode GeofencingApi.list}. */
+export type GeofenceListOptions = {
+  /** 1-based page number to fetch. */
+  page?: number;
+
+  /** Maximum number of fences to return per page. */
+  limit?: number;
+};
+
 /** One page of geofences returned by {@linkcode GeofencingApi.list}. */
 export type GeofencePage = {
   /** Geofences on this page. */

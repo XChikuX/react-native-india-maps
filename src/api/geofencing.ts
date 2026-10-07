@@ -4,6 +4,7 @@ import { arrayOf, asNumber, type Raw } from '../utils/parse';
 import type {
   Geofence,
   GeofenceData,
+  GeofenceListOptions,
   GeofencePage,
   GeofenceStatusResult,
 } from '../types/geofencing';
@@ -32,10 +33,14 @@ export class GeofencingApi extends BaseApi {
     if (this.provider === 'mappls') {
       throw unsupported('GeofencingApi.create');
     }
-    return this.request<Geofence>('/geofencing/v1/fences', {
-      method: 'POST',
-      body: geofenceData,
-    });
+    return this.request<Geofence>(
+      '/geofencing/v1/fences',
+      {
+        method: 'POST',
+        body: geofenceData,
+      },
+      this.sdkTarget
+    );
   }
 
   /**
@@ -49,7 +54,11 @@ export class GeofencingApi extends BaseApi {
     if (this.provider === 'mappls') {
       throw unsupported('GeofencingApi.getById');
     }
-    return this.request<Geofence>(`/geofencing/v1/fences/${fenceId}`);
+    return this.request<Geofence>(
+      `/geofencing/v1/fences/${fenceId}`,
+      undefined,
+      this.sdkTarget
+    );
   }
 
   /**
@@ -66,10 +75,14 @@ export class GeofencingApi extends BaseApi {
     if (this.provider === 'mappls') {
       throw unsupported('GeofencingApi.update');
     }
-    return this.request<Geofence>(`/geofencing/v1/fences/${fenceId}`, {
-      method: 'PUT',
-      body: data,
-    });
+    return this.request<Geofence>(
+      `/geofencing/v1/fences/${fenceId}`,
+      {
+        method: 'PUT',
+        body: data,
+      },
+      this.sdkTarget
+    );
   }
 
   /**
@@ -83,9 +96,13 @@ export class GeofencingApi extends BaseApi {
     if (this.provider === 'mappls') {
       throw unsupported('GeofencingApi.deleteById');
     }
-    await this.request<void>(`/geofencing/v1/fences/${fenceId}`, {
-      method: 'DELETE',
-    });
+    await this.request<void>(
+      `/geofencing/v1/fences/${fenceId}`,
+      {
+        method: 'DELETE',
+      },
+      this.sdkTarget
+    );
   }
 
   /**
@@ -96,21 +113,28 @@ export class GeofencingApi extends BaseApi {
    */
   async list(
     projectId: string,
-    page?: number,
-    limit?: number
+    options?: GeofenceListOptions
   ): Promise<GeofencePage> {
     this.requireAccessToken('GeofencingApi.list');
     if (this.provider === 'mappls') {
       throw unsupported('GeofencingApi.list');
     }
-    const response = await this.request<Raw>('/geofencing/v1/fences', {
-      params: { project_id: projectId, page, limit },
-    });
+    const response = await this.request<Raw>(
+      '/geofencing/v1/fences',
+      {
+        params: {
+          project_id: projectId,
+          page: options?.page,
+          limit: options?.limit,
+        },
+      },
+      this.sdkTarget
+    );
     return {
       fences: arrayOf(response.fences) as Geofence[],
       total: asNumber(response.total),
-      page,
-      limit,
+      page: options?.page,
+      limit: options?.limit,
     };
   }
 
@@ -132,7 +156,8 @@ export class GeofencingApi extends BaseApi {
       `/geofencing/v1/fences/${fenceId}/status`,
       {
         params: { lat: location.lat, lng: location.lng },
-      }
+      },
+      this.sdkTarget
     );
   }
 }

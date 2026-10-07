@@ -97,7 +97,7 @@ describe('API endpoint construction (Mappls)', () => {
     );
     await client.elevation.getElevation(12.9, 77.6);
     const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain('/advancedmaps/v1/test-token/elevation');
+    expect(url).toContain('https://sdk.mappls.com/map/utils/elevation');
     expect(url).toContain('locations=12.9%2C77.6');
   });
 
@@ -107,7 +107,9 @@ describe('API endpoint construction (Mappls)', () => {
       .mockResolvedValue(jsonResponse({ suggestedLocations: [] }));
     await client.places.autocomplete('delhi');
     const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain('/api/places/search/json');
+    expect(url).toContain(
+      'https://search.mappls.com/search/places/autosuggest/json'
+    );
     expect(url).toContain('query=delhi');
     expect(url).toContain('access_token=test-token');
   });

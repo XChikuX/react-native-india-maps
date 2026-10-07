@@ -37,14 +37,36 @@ export type MapOptions = {
   /** Center coordinate in `[longitude, latitude]` order. */
   center?: [longitude: number, latitude: number];
 
-  /** Zoom level. */
+  /** Zoom level. @default 12 */
   zoom?: number;
 
-  /** Bearing in degrees. */
+  /** Bearing in degrees. @default 0 */
   bearing?: number;
 
-  /** Pitch in degrees. */
+  /** Pitch in degrees. @default 0 */
   pitch?: number;
+};
+
+/**
+ * Resolved MapLibre map configuration returned by
+ * {@linkcode TilesApi.getMapOptions}. Unlike {@linkcode MapOptions}, the
+ * defaults are already applied, so only `center` can be absent.
+ */
+export type MapConfiguration = {
+  /** Style URL or style name to pass to MapLibre's `mapStyle` prop. */
+  mapStyle: string;
+
+  /** Initial center in `[longitude, latitude]` order, when requested. */
+  center?: [longitude: number, latitude: number];
+
+  /** Initial zoom level. */
+  zoom: number;
+
+  /** Initial bearing in degrees. */
+  bearing: number;
+
+  /** Initial pitch in degrees. */
+  pitch: number;
 };
 
 /** Marker accepted by static-map URLs: any coordinate or a raw `"lat,lng"` string. */

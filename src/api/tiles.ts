@@ -1,16 +1,15 @@
 import { IndiaMapsError } from '../errors';
-import { resolveAccessToken } from '../utils/config';
+import { resolveAccessToken, resolveProviderHosts } from '../utils/config';
 import { toLatLngString } from '../utils/coordinates';
 import type { IndiaMapsConfig, MapProvider } from '../types/common';
 import type {
+  MapConfiguration,
   MapOptions,
   StaticMapMarker,
   StaticMapOptions,
   TransformRequest,
 } from '../types/tiles';
 
-const OLA_TILE_BASE_URL = 'https://api.olamaps.io';
-const MAPPLS_TILE_BASE_URL = 'https://tile.mappls.com';
 const DEFAULT_STYLE = 'default-light-standard';
 
 /**
@@ -23,11 +22,13 @@ export class TilesApi {
   private readonly provider: MapProvider;
 
   constructor(config: IndiaMapsConfig = {}) {
+    const provider = config.provider ?? 'ola';
     this.accessToken = resolveAccessToken(config);
-    this.provider = config.provider ?? 'ola';
+    this.provider = provider;
     this.tileBaseUrl =
       config.tileBaseUrl ??
-      (this.provider === 'mappls' ? MAPPLS_TILE_BASE_URL : OLA_TILE_BASE_URL);
+      config.baseUrl ??
+      resolveProviderHosts(provider).tiles;
   }
 
   /** Returns the effective style identifier. @default 'default-light-standard' */
@@ -71,13 +72,7 @@ export class TilesApi {
   }
 
   /** Returns a full MapLibre map configuration. */
-  getMapOptions(options?: MapOptions): {
-    mapStyle: string;
-    center?: [number, number];
-    zoom?: number;
-    bearing?: number;
-    pitch?: number;
-  } {
+  getMapOptions(options?: MapOptions): MapConfiguration {
     return {
       mapStyle: this.getStyleURL(options?.style),
       center: options?.center,

@@ -1,6 +1,6 @@
 import { IndiaMapsError } from '../errors';
 import { VERSION } from '../version';
-import { resolveAccessToken, resolveBaseUrl } from '../utils/config';
+import { resolveAccessToken, resolveProviderHosts } from '../utils/config';
 import type { IndiaMapsConfig, MapProvider } from '../types/common';
 
 type ParamValue = string | number | boolean | undefined | null;
@@ -27,30 +27,55 @@ export class BaseApi {
   protected readonly baseUrl: string;
   protected readonly provider: MapProvider;
   protected readonly searchBaseUrl: string;
+  protected readonly placeDetailsBaseUrl: string;
   protected readonly routeBaseUrl: string;
+  protected readonly elevationBaseUrl: string;
   protected readonly sdkBaseUrl: string;
-  protected readonly tileBaseUrl: string;
 
   constructor(config: IndiaMapsConfig) {
     this.accessToken = resolveAccessToken(config);
     this.provider = config.provider ?? 'ola';
-    this.baseUrl = resolveBaseUrl(config);
-    this.searchBaseUrl =
-      config.searchBaseUrl ??
-      (this.provider === 'mappls'
-        ? 'https://atlas.mappls.com'
-        : 'https://api.olamaps.io');
-    this.routeBaseUrl =
-      config.routeBaseUrl ??
-      (this.provider === 'mappls'
-        ? 'https://apis.mappls.com'
-        : 'https://api.olamaps.io');
-    this.sdkBaseUrl = config.sdkBaseUrl ?? 'https://api.olamaps.io';
-    this.tileBaseUrl =
-      config.tileBaseUrl ??
-      (this.provider === 'mappls'
-        ? 'https://tile.mappls.com'
-        : 'https://api.olamaps.io');
+    const hosts = resolveProviderHosts(this.provider);
+
+    // `baseUrl` is the global override; the domain-specific URLs layer on top
+    // of it so a single proxy or gateway config still applies everywhere.
+    // `baseUrl` also redirects Mappls routing, elevation and tiles, which
+    // otherwise default to their own provider hosts.
+    this.searchBaseUrl = config.searchBaseUrl ?? config.baseUrl ?? hosts.search;
+    this.placeDetailsBaseUrl =
+      config.searchBaseUrl ?? config.baseUrl ?? hosts.placeDetails;
+    this.routeBaseUrl = config.routeBaseUrl ?? config.baseUrl ?? hosts.route;
+    this.elevationBaseUrl =
+      config.routeBaseUrl ?? config.baseUrl ?? hosts.elevation;
+    this.sdkBaseUrl = config.sdkBaseUrl ?? config.baseUrl ?? hosts.search;
+
+    // Fallback for callers that do not pass an explicit target.
+    this.baseUrl = config.baseUrl ?? hosts.search;
+  }
+
+  /** Request target for places search and geocoding endpoints. */
+  protected get searchTarget(): { baseUrl: string } {
+    return { baseUrl: this.searchBaseUrl };
+  }
+
+  /** Request target for place-details endpoints. */
+  protected get placeDetailsTarget(): { baseUrl: string } {
+    return { baseUrl: this.placeDetailsBaseUrl };
+  }
+
+  /** Request target for routing and roads endpoints. */
+  protected get routeTarget(): { baseUrl: string } {
+    return { baseUrl: this.routeBaseUrl };
+  }
+
+  /** Request target for elevation endpoints. */
+  protected get elevationTarget(): { baseUrl: string } {
+    return { baseUrl: this.elevationBaseUrl };
+  }
+
+  /** Request target for geofencing endpoints. */
+  protected get sdkTarget(): { baseUrl: string } {
+    return { baseUrl: this.sdkBaseUrl };
   }
 
   /**
@@ -72,14 +97,14 @@ export class BaseApi {
   protected buildUrl(
     path: string,
     params?: Record<string, ParamValue>,
-    opts?: { baseUrl?: string; includeAccessToken?: boolean }
+    opts?: { baseUrl?: string }
   ): URL {
     const rawUrl = path.startsWith('http')
       ? path
       : `${opts?.baseUrl ?? this.baseUrl}${path}`;
     const url = new URL(rawUrl);
 
-    if (opts?.includeAccessToken !== false && this.accessToken) {
+    if (this.accessToken) {
       const tokenParam =
         this.provider === 'mappls' ? 'access_token' : 'api_key';
       url.searchParams.set(tokenParam, this.accessToken);
@@ -106,7 +131,7 @@ export class BaseApi {
   protected async request<T>(
     path: string,
     options?: RequestOptions,
-    opts?: { baseUrl?: string; includeAccessToken?: boolean }
+    opts?: { baseUrl?: string }
   ): Promise<T> {
     const url = this.buildUrl(path, options?.params, opts);
     const headers = new Headers(options?.headers);

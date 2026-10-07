@@ -2,6 +2,7 @@ import { BaseApi } from './base';
 import { IndiaMapsError } from '../errors';
 import { arrayOf, asNumber, asString, type Raw } from '../utils/parse';
 import type {
+  NearestRoadsOptions,
   NearestRoadsResult,
   RoadPoint,
   SnapToRoadResult,
@@ -9,26 +10,39 @@ import type {
   SpeedLimitsResult,
 } from '../types/roads';
 
-type TravelMode = 'driving' | 'walking' | 'biking' | 'trucking' | string;
-
 const serializePoints = (points: RoadPoint[]) =>
   points.map((point) => `${point.latitude},${point.longitude}`).join('|');
 
 const serializePointsLngLat = (points: RoadPoint[]) =>
   points.map((point) => `${point.longitude},${point.latitude}`).join(';');
 
+/**
+ * Reads a snapped point from a provider payload. Ola Maps returns
+ * `location: { latitude, longitude }`; Mappls returns
+ * `location: [longitude, latitude]` with `waypoint_index`.
+ */
 const toSnappedPoint = (raw: Raw): SnappedPoint | undefined => {
-  const location = (raw.location ?? raw.position ?? raw ?? {}) as Raw;
-  const latitude = asNumber(location.latitude ?? location.lat);
-  const longitude = asNumber(
-    location.longitude ?? location.lng ?? location.lon
-  );
+  const location = raw.location ?? raw.position ?? raw;
+
+  let latitude: number | undefined;
+  let longitude: number | undefined;
+  if (Array.isArray(location)) {
+    longitude = asNumber(location[0]);
+    latitude = asNumber(location[1]);
+  } else if (location !== null && typeof location === 'object') {
+    const node = location as Raw;
+    latitude = asNumber(node.latitude ?? node.lat);
+    longitude = asNumber(node.longitude ?? node.lng ?? node.lon);
+  }
+
   if (latitude === undefined || longitude === undefined) {
     return undefined;
   }
   return {
     location: { latitude, longitude },
-    originalIndex: asNumber(raw.originalIndex ?? raw.index),
+    originalIndex: asNumber(
+      raw.originalIndex ?? raw.index ?? raw.waypoint_index
+    ),
     placeId: asString(raw.placeId ?? raw.place_id),
   };
 };
@@ -38,9 +52,11 @@ const toSnappedPoint = (raw: Raw): SnappedPoint | undefined => {
  */
 export class RoadsApi extends BaseApi {
   /**
-   * Snaps GPS points to the road network. On Mappls this maps to the
-   * snap-to-road endpoint with point-wise snapping (`type: 'break'`).
+   * Snaps GPS points to the road network.
    *
+   * @param enhancePath Requests an interpolated path between the snapped
+   * points. Ola Maps only; ignored by Mappls, whose snap-to-road endpoint has
+   * no interpolation flag.
    * @throws {@linkcode IndiaMapsError} on configuration, network or API failure.
    */
   async snapToRoad(
@@ -49,32 +65,28 @@ export class RoadsApi extends BaseApi {
   ): Promise<SnapToRoadResult> {
     this.requireAccessToken('RoadsApi.snapToRoad');
     if (this.provider === 'mappls') {
-      const body = new URLSearchParams();
-      body.set('points', serializePointsLngLat(points));
-      body.set('type', 'break');
-      if (enhancePath) {
-        body.set('search_radius', '12');
-      }
-
       const response = await this.request<Raw>(
-        `/advancedmaps/v1/${this.accessToken}/snapToRoad`,
+        '/route/movement/snapToRoad',
         {
-          method: 'POST',
-          body,
-          skipJsonSerialization: true,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          params: {
+            pts: serializePointsLngLat(points),
+          },
         },
-        { baseUrl: this.routeBaseUrl, includeAccessToken: false }
+        this.routeTarget
       );
       return { snappedPoints: this.normalizeSnappedPoints(response) };
     }
 
-    const response = await this.request<Raw>('/routing/v1/snapToRoad', {
-      params: {
-        points: serializePoints(points),
-        interpolate: enhancePath,
+    const response = await this.request<Raw>(
+      '/routing/v1/snapToRoad',
+      {
+        params: {
+          points: serializePoints(points),
+          interpolate: enhancePath,
+        },
       },
-    });
+      this.routeTarget
+    );
     return { snappedPoints: this.normalizeSnappedPoints(response) };
   }
 
@@ -86,20 +98,23 @@ export class RoadsApi extends BaseApi {
    */
   async nearestRoads(
     points: RoadPoint[],
-    mode?: TravelMode,
-    radius?: number
+    options?: NearestRoadsOptions
   ): Promise<NearestRoadsResult> {
     this.requireAccessToken('RoadsApi.nearestRoads');
     if (this.provider === 'mappls') {
-      return this.snapToRoad(points, Boolean(radius || mode));
+      return this.snapToRoad(points);
     }
 
-    const response = await this.request<Raw>('/routing/v1/nearestRoads', {
-      params: {
-        points: serializePoints(points),
-        radius,
+    const response = await this.request<Raw>(
+      '/routing/v1/nearestRoads',
+      {
+        params: {
+          points: serializePoints(points),
+          radius: options?.radius,
+        },
       },
-    });
+      this.routeTarget
+    );
     return { snappedPoints: this.normalizeSnappedPoints(response) };
   }
 
@@ -110,10 +125,7 @@ export class RoadsApi extends BaseApi {
    * @throws {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'` when
    * the configured provider is Mappls; it has no public speed-limit API.
    */
-  async speedLimits(
-    points: RoadPoint[],
-    _snapStrategy?: string
-  ): Promise<SpeedLimitsResult> {
+  async speedLimits(points: RoadPoint[]): Promise<SpeedLimitsResult> {
     this.requireAccessToken('RoadsApi.speedLimits');
     if (this.provider === 'mappls') {
       throw new IndiaMapsError(
@@ -122,11 +134,15 @@ export class RoadsApi extends BaseApi {
       );
     }
 
-    const response = await this.request<Raw>('/routing/v1/speedLimits', {
-      params: {
-        points: serializePoints(points),
+    const response = await this.request<Raw>(
+      '/routing/v1/speedLimits',
+      {
+        params: {
+          points: serializePoints(points),
+        },
       },
-    });
+      this.routeTarget
+    );
     const raw = (response ?? {}) as Raw;
     return {
       speedLimits: arrayOf(raw.speedLimits),
@@ -136,11 +152,18 @@ export class RoadsApi extends BaseApi {
 
   private normalizeSnappedPoints(response: unknown): SnappedPoint[] {
     const raw = (response ?? {}) as Raw;
-    const list = arrayOf(raw.snappedPoints).length
-      ? arrayOf(raw.snappedPoints)
-      : arrayOf(raw.locations);
+    const results = (raw.results ?? {}) as Raw;
+
+    const topLevel = arrayOf<Raw | null>(raw.snappedPoints);
+    const nested = arrayOf<Raw | null>(results.snappedPoints);
+    const list = topLevel.length
+      ? topLevel
+      : nested.length
+        ? nested
+        : arrayOf<Raw | null>(raw.locations);
+
     return list
-      .map(toSnappedPoint)
+      .map((point) => (point === null ? undefined : toSnappedPoint(point)))
       .filter((point): point is SnappedPoint => point !== undefined);
   }
 }

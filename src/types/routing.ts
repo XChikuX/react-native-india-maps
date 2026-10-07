@@ -15,7 +15,7 @@ export type OverviewLevel = 'full' | 'simplified' | false;
 export type GeometryFormat = 'polyline' | 'polyline6' | 'geojson';
 
 /** Mappls routing resource variant. */
-export type MapplsRouteResource = 'route' | 'route_eta' | 'route_traffic';
+export type MapplsRouteResource = 'route_adv' | 'route_eta' | 'route_traffic';
 
 /** Route preference hint accepted by Ola Maps routing endpoints. */
 export type RoutePreference = 'shortest' | 'fastest' | 'eco';
@@ -49,7 +49,7 @@ export type DirectionsOptions = {
   /** Ola Maps routing preference. */
   routePreference?: RoutePreference;
 
-  /** Mappls resource variant. @default 'route' */
+  /** Mappls resource variant. @default 'route_adv' */
   resource?: MapplsRouteResource;
 };
 

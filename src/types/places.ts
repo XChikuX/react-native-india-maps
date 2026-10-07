@@ -17,9 +17,6 @@ export type AutocompleteOptions = {
   /** Restricts results to a provider-specific place type, e.g. `'restaurant'`. */
   types?: string;
 
-  /** Mappls zoom-level bias (4–18). */
-  zoom?: number;
-
   /** Mappls: ranks hyper-local results higher; requires `location`. */
   hyperLocal?: boolean;
 
@@ -153,11 +150,14 @@ export type NearbySearchOptions = {
    */
   filter?: string;
 
-  /** Mappls: includes rich data in results. */
-  richData?: boolean;
-
-  /** Mappls sort order, e.g. `'dist'`. */
+  /** Mappls sort order, e.g. `'dist:asc'`. */
   sortBy?: string;
+
+  /**
+   * Mappls place type code restricting results:
+   * `'SLC'`, `'LC'`, `'CITY'`, `'STATE'`.
+   */
+  pod?: string;
 };
 
 /**
@@ -174,26 +174,14 @@ export type TextSearchOptions = {
   /** Bias radius in meters (Ola Maps). */
   radius?: number;
 
-  /** Response language. */
+  /** Response language (Ola Maps). */
   language?: Language;
 
-  /** Restricts results to a provider-specific place type. */
+  /** Restricts results to a provider-specific place type (Ola Maps). */
   types?: string;
 
-  /** Mappls zoom-level bias (4–18). */
-  zoom?: number;
-
-  /** Mappls: ranks hyper-local results higher; requires `location`. */
-  hyperLocal?: boolean;
-
-  /** Mappls result filter. */
+  /** Mappls result filter, e.g. `'pin:110055'`. */
   filter?: string;
-
-  /** Mappls place type code. */
-  pod?: string;
-
-  /** Mappls: returns structured address tokens in results. */
-  tokenizeAddress?: boolean;
 };
 
 /**

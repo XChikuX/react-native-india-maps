@@ -34,6 +34,12 @@ export type SnapToRoadResult = {
   snappedPoints: SnappedPoint[];
 };
 
+/** Options accepted by {@linkcode RoadsApi.nearestRoads}. */
+export type NearestRoadsOptions = {
+  /** Search radius in meters (Ola Maps only). */
+  radius?: number;
+};
+
 /**
  * Provider-normalized nearest-roads result returned by
  * {@linkcode RoadsApi.nearestRoads}. On Mappls this is approximated by

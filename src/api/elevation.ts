@@ -11,7 +11,9 @@ const normalizeElevations = (response: unknown): ElevationResult[] => {
     ? arrayOf(raw.results)
     : arrayOf(raw.elevations);
   return list.map((item) => {
-    const position = (item.location ?? item.position ?? {}) as Raw;
+    // Ola nests the coordinate under `location`; Mappls returns flat
+    // `latitude`/`longitude` on the elevation entry itself.
+    const position = (item.location ?? item.position ?? item) as Raw;
     return {
       elevation: asNumber(item.elevation) ?? 0,
       location: toLatLngLiteral(
@@ -59,18 +61,22 @@ export class ElevationApi extends BaseApi {
 
     if (this.provider === 'mappls') {
       const response = await this.request<Raw>(
-        `/advancedmaps/v1/${this.accessToken}/elevation`,
+        '/map/utils/elevation',
         {
           params: { locations },
         },
-        { baseUrl: this.routeBaseUrl, includeAccessToken: false }
+        this.elevationTarget
       );
       return { results: normalizeElevations(response) };
     }
 
-    const response = await this.request<Raw>('/elevation/v1/getElevation', {
-      params: { locations },
-    });
+    const response = await this.request<Raw>(
+      '/elevation/v1/getElevation',
+      {
+        params: { locations },
+      },
+      this.elevationTarget
+    );
     return { results: normalizeElevations(response) };
   }
 }

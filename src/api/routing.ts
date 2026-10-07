@@ -78,9 +78,9 @@ export class RoutingApi extends BaseApi {
     if (this.provider === 'mappls') {
       const resource = options?.trafficMetadata
         ? 'route_traffic'
-        : (options?.resource ?? 'route');
+        : (options?.resource ?? 'route_adv');
       const response = await this.request<Raw>(
-        `/advancedmaps/v1/${this.accessToken}/direction/${resource}/${mode}/${geopositions}`,
+        `/route/direction/${resource}/${mode}/${geopositions}`,
         {
           params: {
             alternatives: options?.alternatives,
@@ -89,7 +89,7 @@ export class RoutingApi extends BaseApi {
             geometries: options?.geometries,
           },
         },
-        { baseUrl: this.routeBaseUrl, includeAccessToken: false }
+        this.routeTarget
       );
       return normalizeDirections(response);
     }
@@ -106,7 +106,8 @@ export class RoutingApi extends BaseApi {
           route_preference: options?.routePreference,
           language: options?.language,
         },
-      }
+      },
+      this.routeTarget
     );
     return normalizeDirections(response);
   }
@@ -129,7 +130,7 @@ export class RoutingApi extends BaseApi {
       const resource = options?.resource ?? 'distance_matrix';
       const geopositions = joinLngLat([...origins, ...destinations]);
       const response = await this.request<Raw>(
-        `/advancedmaps/v1/${this.accessToken}/${resource}/${mode}/${geopositions}`,
+        `/route/dm/${resource}/${mode}/${geopositions}`,
         {
           params: {
             sources: origins.map((_, index) => index).join(';'),
@@ -138,7 +139,7 @@ export class RoutingApi extends BaseApi {
               .join(';'),
           },
         },
-        { baseUrl: this.routeBaseUrl, includeAccessToken: false }
+        this.routeTarget
       );
       return normalizeDistanceMatrix(response);
     }
@@ -152,7 +153,8 @@ export class RoutingApi extends BaseApi {
           route_preference: options?.routePreference,
           language: options?.language,
         },
-      }
+      },
+      this.routeTarget
     );
     return normalizeDistanceMatrix(response);
   }
@@ -173,7 +175,7 @@ export class RoutingApi extends BaseApi {
     if (this.provider === 'mappls') {
       const resource = options?.resource ?? 'trip_optimization_eta';
       const response = await this.request<Raw>(
-        `/advancedmaps/v1/${this.accessToken}/${resource}/${mode}/${geopositions}`,
+        `/route/optimization/${resource}/${mode}/${geopositions}`,
         {
           params: {
             source: options?.source,
@@ -183,7 +185,7 @@ export class RoutingApi extends BaseApi {
             overview: serializeOverview(options?.overview),
           },
         },
-        { baseUrl: this.routeBaseUrl, includeAccessToken: false }
+        this.routeTarget
       );
       return normalizeRouteOptimizer(response);
     }
@@ -201,7 +203,8 @@ export class RoutingApi extends BaseApi {
           route_preference: options?.routePreference,
           language: options?.language,
         },
-      }
+      },
+      this.routeTarget
     );
     return normalizeRouteOptimizer(response);
   }
@@ -221,6 +224,7 @@ const normalizeDirections = (response: unknown): DirectionsResult => {
 
 const normalizeDistanceMatrix = (response: unknown): DistanceMatrixResult => {
   const raw = (response ?? {}) as Raw;
+  const results = (raw.results ?? {}) as Raw;
   const matrix = (raw.matrix ?? {}) as Raw;
   const rows = arrayOf(raw.distanceMatrix);
 
@@ -234,7 +238,9 @@ const normalizeDistanceMatrix = (response: unknown): DistanceMatrixResult => {
   };
 
   return (
-    // OSRM-style grids (Mappls distance_matrix and compatible responses).
+    // Mappls wraps the grids in a `results` envelope.
+    fromGrids(results) ??
+    // OSRM-style top-level grids (Mappls distance_matrix compatible).
     fromGrids(raw) ??
     fromGrids(matrix) ?? {
       // Ola cell-based rows: distanceMatrix[].distanceMatrixCells[].
