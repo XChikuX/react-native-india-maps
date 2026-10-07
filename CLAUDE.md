@@ -53,8 +53,6 @@ bun run typecheck
 | Ola Maps | `https://api.olamaps.io` | `api_key` | Default provider |
 | Mappls | `https://search.mappls.com`, `https://place.mappls.com`, `https://route.mappls.com`, `https://sdk.mappls.com`, `https://tile.mappls.com` | `access_token` | Capabilities split across hosts |
 
-## Key APIs
-
 | Capability | Ola Endpoint | Mappls Endpoint |
 | --- | --- | --- |
 | Autocomplete | `/places/v1/autocomplete` | `/search/places/autosuggest/json` |
@@ -63,14 +61,17 @@ bun run typecheck
 | Place Details | `/places/v1/details` | `/apis/O2O/entity/{eLoc}` |
 | Nearby Search | `/places/v1/nearbysearch` | `/api/places/nearby/json` |
 | Text Search | `/places/v1/textsearch` | `/api/places/textsearch/json` |
-| Directions | `/routing/v1/directions/{mode}/{coords}` | `/route/direction/{route_adv}/{profile}/{coords}` |
-| Distance Matrix | `/routing/v1/distanceMatrix/{mode}` | `/route/dm/{distance_matrix}/{profile}/{coords}` |
-| Route Optimizer | `/routing/v1/routeOptimizer/{mode}/{coords}` | `/route/optimization/{resource}/{profile}/{coords}` |
-| Snap to Road | `/routing/v1/snapToRoad` | `/route/movement/snapToRoad` |
-| Elevation | `/elevation/v1/getElevation` | `/map/utils/elevation` |
-| Geofencing | `/geofencing/v1/fences` | N/A (not public) |
+| Address Validation | `/places/v1/addressvalidation` | N/A (not public) |
+| Directions | POST `/routing/v1/directions` (query params) | `/route/direction/{route_adv}/{profile}/{coords}` |
+| Distance Matrix | GET `/routing/v1/distanceMatrix` (query params) | `/route/dm/{distance_matrix}/{profile}/{coords}` |
+| Route Optimizer | POST `/routing/v1/routeOptimizer` (query params) | `/route/optimization/{resource}/{profile}/{coords}` |
+| Snap to Road | `/routing/v1/snapToRoad` (`enhancePath`) | `/route/movement/snapToRoad` |
+| Nearest Roads | `/routing/v1/nearestRoads` (requires `mode`) | N/A (approximated via snap-to-road) |
+| Speed Limits | `/routing/v1/speedLimits` (`snapStrategy`) | N/A (not public) |
+| Elevation | GET/POST `/places/v1/elevation` | `/map/utils/elevation` |
+| Geofencing | `/places/v1/geofence`, `/places/v1/geofences` | N/A (not public) |
 | Map Tiles | `/tiles/vector/v1/styles/{style}/style.json` | N/A (no public vector styles) |
-| Static Map | `/tiles/v1/styles/default/static` | `/map/raster_tile/still_image` |
+| Static Map | `/tiles/v1/styles/{style}/static/{lon},{lat},{zoom}/{w}x{h}.{format}` | `/map/raster_tile/still_image` |
 
 ## Expo
 

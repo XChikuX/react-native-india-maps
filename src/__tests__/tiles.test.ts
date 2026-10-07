@@ -28,8 +28,10 @@ describe('TilesApi', () => {
       markers: ['12.9,77.6'],
     });
 
-    expect(url).toContain('/tiles/v1/styles/default/static');
-    expect(url).toContain('center=12.9%2C77.6');
+    expect(url).toContain(
+      '/tiles/v1/styles/default-light-standard/static/77.6,12.9,12/600x400.png'
+    );
+    expect(url).toContain('marker=77.6%2C12.9');
     expect(url).toContain('api_key=test-token');
   });
 
@@ -42,7 +44,43 @@ describe('TilesApi', () => {
       markers: [{ latitude: 12.9, longitude: 77.6 }],
     });
 
-    expect(url).toContain('markers=12.9%2C77.6');
+    expect(url).toContain('marker=77.6%2C12.9');
+  });
+
+  it('builds Ola path overlays with style options', () => {
+    const url = tiles.getStaticMapURL({
+      center: [77.6, 12.9],
+      zoom: 12,
+      width: 600,
+      height: 400,
+      path: {
+        coordinates: [
+          [77.61, 12.93],
+          [77.62, 12.94],
+        ],
+        widthPx: 6,
+        strokeColor: '#00ff44',
+      },
+    });
+
+    expect(url).toContain(
+      'path=77.61%2C12.93%7C77.62%2C12.94%7Cwidth%3A6%7Cstroke%3A%2300ff44'
+    );
+  });
+
+  it('honors the Ola image format option', () => {
+    const url = tiles.getStaticMapURL({
+      center: [77.6, 12.9],
+      zoom: 12,
+      width: 600,
+      height: 400,
+      style: 'default-dark-standard',
+      format: 'jpg',
+    });
+
+    expect(url).toContain(
+      '/tiles/v1/styles/default-dark-standard/static/77.6,12.9,12/600x400.jpg'
+    );
   });
 
   it('builds Mappls static map URLs', () => {

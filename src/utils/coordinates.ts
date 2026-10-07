@@ -42,6 +42,17 @@ export function toLngLat(location: LatLngInput): LngLat {
 }
 
 /**
+ * Joins coordinates into a provider query-parameter list in
+ * `[latitude,longitude]` order, e.g. `'12.97,77.59|12.98,77.60'`.
+ */
+export function joinLatLng(
+  locations: LatLngInput[],
+  separator: string = '|'
+): string {
+  return locations.map((location) => toLatLngString(location)).join(separator);
+}
+
+/**
  * Joins coordinates into a provider path segment in `[longitude,latitude]`
  * order, e.g. `'77.59,12.97;77.60,12.98'`.
  */

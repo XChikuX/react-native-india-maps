@@ -1,24 +1,42 @@
 import type { LatLngInput, LngLat } from './common';
 
 /**
- * Travel mode accepted by routing endpoints. Ola Maps supports all modes;
- * Mappls supports `'driving'`, `'biking'` and `'walking'`.
+ * Travel mode accepted by routing endpoints.
+ *
+ * - Ola Maps supports `'driving'`, `'walking'`, `'biking'` (sent as `bike`)
+ *   and `'auto'`; `'trucking'` throws an
+ *   {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'`.
+ * - Mappls supports `'driving'`, `'walking'` and `'biking'`; `'auto'` and
+ *   `'trucking'` throw the same error.
  *
  * @see {@linkcode RoutingApi.getDirections}
  */
-export type TravelMode = 'driving' | 'walking' | 'biking' | 'trucking';
+export type TravelMode = 'driving' | 'walking' | 'biking' | 'auto' | 'trucking';
 
-/** Route geometry detail level. `false` omits the geometry. */
+/**
+ * Route geometry detail level. `false` omits the geometry.
+ *
+ * @see {@linkcode DirectionsOptions.overview}
+ */
 export type OverviewLevel = 'full' | 'simplified' | false;
 
-/** Encoding of returned route geometries. */
+/**
+ * Encoding of returned route geometries. Mappls only; Ola Maps always returns
+ * encoded polylines.
+ *
+ * @see {@linkcode DirectionsOptions.geometries}
+ */
 export type GeometryFormat = 'polyline' | 'polyline6' | 'geojson';
 
 /** Mappls routing resource variant. */
 export type MapplsRouteResource = 'route_adv' | 'route_eta' | 'route_traffic';
 
-/** Route preference hint accepted by Ola Maps routing endpoints. */
-export type RoutePreference = 'shortest' | 'fastest' | 'eco';
+/**
+ * Route preference hint accepted by Ola Maps routing endpoints.
+ *
+ * @see {@linkcode RoutingApi.getDirections}
+ */
+export type RoutePreference = 'fastest' | 'shortest';
 
 /** Options accepted by {@linkcode RoutingApi.getDirections}. */
 export type DirectionsOptions = {
@@ -28,16 +46,21 @@ export type DirectionsOptions = {
   /** Returns alternative routes in addition to the best one. */
   alternatives?: boolean;
 
-  /** Includes turn-by-turn steps in each leg. */
+  /** Includes turn-by-turn steps in each leg. Ola Maps default: `true`. */
   steps?: boolean;
 
-  /** Geometry detail level. @default 'simplified' */
+  /**
+   * Geometry detail level. Ola Maps default: `'full'`.
+   */
   overview?: OverviewLevel;
 
-  /** Geometry encoding of returned routes. */
+  /** Geometry encoding of returned routes (Mappls only). */
   geometries?: GeometryFormat;
 
-  /** Ordered intermediate stops between the origin and the destination. */
+  /**
+   * Ordered intermediate stops between the origin and the destination.
+   * Ola Maps accepts at most 25 waypoints and keeps their order.
+   */
   waypoints?: LatLngInput[];
 
   /** Response language. */
@@ -70,8 +93,11 @@ export type RouteStep = {
   /** Route designation of the step, e.g. `'NH44'`. */
   ref?: string;
 
-  /** Maneuver instruction identifier, provider-specific. */
+  /** Maneuver instruction identifier, provider-specific, e.g. `'turn-right'`. */
   maneuver?: string;
+
+  /** Turn-by-turn instruction text, when the provider reports it (Ola Maps). */
+  instructions?: string;
 
   /** Step start coordinate in `[longitude, latitude]` order. */
   location?: LngLat;
@@ -146,9 +172,6 @@ export type DistanceMatrixOptions = {
   /** Travel mode. @default 'driving' */
   mode?: TravelMode;
 
-  /** Response language. */
-  language?: string;
-
   /** Ola Maps routing preference. */
   routePreference?: RoutePreference;
 
@@ -179,19 +202,27 @@ export type RouteOptimizerOptions = {
   /** Travel mode. @default 'driving' */
   mode?: TravelMode;
 
-  /** Fixes the start of the optimized trip. */
+  /**
+   * Fixes the start of the optimized trip. Ola Maps accepts `'first'` and
+   * `'any'` only (default `'first'`).
+   */
   source?: 'first' | 'last' | 'any';
 
-  /** Fixes the end of the optimized trip. */
+  /**
+   * Fixes the end of the optimized trip. Ola Maps accepts `'last'` and
+   * `'any'` only (default `'last'`).
+   */
   destination?: 'first' | 'last' | 'any';
 
   /** Returns to the starting point after the last stop. */
   roundTrip?: boolean;
 
-  /** Includes turn-by-turn steps in returned routes. */
+  /** Includes turn-by-turn steps in returned routes. Ola Maps default: `true`. */
   steps?: boolean;
 
-  /** Geometry detail level. @default 'simplified' */
+  /**
+   * Geometry detail level. Ola Maps default: `'full'`.
+   */
   overview?: OverviewLevel;
 
   /** Response language. */

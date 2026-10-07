@@ -1,4 +1,5 @@
 import { BaseApi } from './base';
+import { IndiaMapsError } from '../errors';
 import {
   arrayOf,
   arrayOrSingleOf,
@@ -9,6 +10,7 @@ import {
 } from '../utils/parse';
 import { toLatLngString, toLngLat } from '../utils/coordinates';
 import type {
+  AddressValidationResult,
   AutocompleteOptions,
   AutocompleteSuggestion,
   GeocodeOptions,
@@ -271,9 +273,10 @@ export class PlacesApi extends BaseApi {
           location: locationString,
           radius: options?.radius,
           types: options?.types,
-          keyword: options?.keyword,
           language: options?.language,
-          rankby: options?.rankBy,
+          rankBy: options?.rankBy,
+          withCentroid: options?.withCentroid,
+          limit: options?.limit,
         },
       },
       this.searchTarget
@@ -320,7 +323,7 @@ export class PlacesApi extends BaseApi {
             : undefined,
           radius: options?.radius,
           types: options?.types,
-          language: options?.language,
+          size: options?.size,
         },
       },
       this.searchTarget
@@ -329,13 +332,34 @@ export class PlacesApi extends BaseApi {
   }
 
   /**
-   * Validates an address by geocoding it and returning the best match, or
-   * `undefined` when the address has no results.
+   * Validates an address and returns the provider's normalization verdict.
+   * Ola Maps only.
    *
-   * @throws {@linkcode IndiaMapsError} on configuration, network or API failure.
+   * @throws {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'` when
+   * the configured provider is Mappls, which has no public validation
+   * endpoint; use {@linkcode PlacesApi.geocode} there instead.
    */
-  async addressValidation(address: string): Promise<GeocodeResult | undefined> {
-    const results = await this.geocode(address);
-    return results[0];
+  async addressValidation(address: string): Promise<AddressValidationResult> {
+    this.requireAccessToken('PlacesApi.addressValidation');
+    if (this.provider === 'mappls') {
+      throw new IndiaMapsError(
+        'Mappls does not expose a public address-validation endpoint. Use PlacesApi.geocode() to resolve an address instead.',
+        'UNSUPPORTED_ERROR'
+      );
+    }
+
+    const response = await this.request<Raw>(
+      '/places/v1/addressvalidation',
+      {
+        params: { address },
+      },
+      this.searchTarget
+    );
+    const raw = (response ?? {}) as Raw;
+    const result = (rawAt(raw, 'result') ?? {}) as Raw;
+    return {
+      isAddressValid: result.validated === true,
+      validatedAddress: asString(result.validated_address),
+    };
   }
 }

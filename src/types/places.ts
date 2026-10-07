@@ -132,10 +132,25 @@ export type NearbySearchOptions = {
   /** Restricts results to a provider-specific place type (Ola Maps). */
   types?: string;
 
-  /** Result ranking. @default 'prominence' */
-  rankBy?: 'prominence' | 'distance';
+  /**
+   * Result ranking (Ola Maps). `'popular'` ranks by popularity, `'distance'`
+   * ranks by distance from `location`. @default 'popular'
+   */
+  rankBy?: 'popular' | 'distance';
 
-  /** Response language. */
+  /**
+   * Include centroid geometry on returned places (Ola Maps).
+   * @default false
+   */
+  withCentroid?: boolean;
+
+  /**
+   * Maximum number of results to return (Ola Maps). Between 5 and 50.
+   * @default 5
+   */
+  limit?: number;
+
+  /** Response language (Ola Maps). */
   language?: Language;
 
   /** Mappls: page number, 10 results per page. */
@@ -174,11 +189,14 @@ export type TextSearchOptions = {
   /** Bias radius in meters (Ola Maps). */
   radius?: number;
 
-  /** Response language (Ola Maps). */
-  language?: Language;
-
   /** Restricts results to a provider-specific place type (Ola Maps). */
   types?: string;
+
+  /**
+   * Maximum number of results to return (Ola Maps).
+   * @default 5
+   */
+  size?: number;
 
   /** Mappls result filter, e.g. `'pin:110055'`. */
   filter?: string;
@@ -189,3 +207,15 @@ export type TextSearchOptions = {
  * {@linkcode PlacesApi.textSearch}.
  */
 export type TextSearchResult = AutocompleteSuggestion;
+
+/**
+ * Result of {@linkcode PlacesApi.addressValidation}, which reports whether
+ * Ola Maps considers the address deliverable and its normalized form.
+ */
+export type AddressValidationResult = {
+  /** Whether the provider validated the address. */
+  isAddressValid: boolean;
+
+  /** Normalized address text, when the provider returns one. */
+  validatedAddress?: string;
+};

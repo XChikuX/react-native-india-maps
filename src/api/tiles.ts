@@ -1,12 +1,13 @@
 import { IndiaMapsError } from '../errors';
 import { resolveAccessToken, resolveProviderHosts } from '../utils/config';
-import { toLatLngString } from '../utils/coordinates';
+import { toLatLngString, toLngLat } from '../utils/coordinates';
 import type { IndiaMapsConfig, MapProvider } from '../types/common';
 import type {
   MapConfiguration,
   MapOptions,
   StaticMapMarker,
   StaticMapOptions,
+  StaticMapPathOptions,
   TransformRequest,
 } from '../types/tiles';
 
@@ -108,15 +109,20 @@ export class TilesApi {
     options: StaticMapOptions,
     accessToken: string
   ): string {
-    const url = new URL('/tiles/v1/styles/default/static', this.tileBaseUrl);
-    url.searchParams.set('center', `${options.center[1]},${options.center[0]}`);
-    url.searchParams.set('zoom', String(options.zoom));
-    url.searchParams.set('size', `${options.width}x${options.height}`);
-    if (options.markers?.length) {
-      url.searchParams.set(
-        'markers',
-        options.markers.map(toMarkerString).join('|')
-      );
+    const style = this.getStyleName(options.style);
+    const format = options.format ?? 'png';
+    const [longitude, latitude] = options.center;
+    const url = new URL(
+      `/tiles/v1/styles/${encodeURIComponent(style)}/static/` +
+        `${longitude},${latitude},${options.zoom}/` +
+        `${options.width}x${options.height}.${format}`,
+      this.tileBaseUrl
+    );
+    options.markers?.forEach((marker) =>
+      url.searchParams.append('marker', toOlaMarkerString(marker))
+    );
+    if (options.path) {
+      url.searchParams.set('path', toOlaPathString(options.path));
     }
     url.searchParams.set('api_key', accessToken);
     return url.toString();
@@ -147,3 +153,34 @@ export class TilesApi {
 
 const toMarkerString = (marker: StaticMapMarker): string =>
   typeof marker === 'string' ? marker : toLatLngString(marker);
+
+/**
+ * Formats a marker for the Ola Maps static API, which uses `lng,lat` order.
+ * Plain `"lat,lng"` strings are converted; preformatted provider strings
+ * (with options such as `|red|scale:0.9`) pass through unchanged.
+ */
+const toOlaMarkerString = (marker: StaticMapMarker): string => {
+  if (typeof marker === 'string') {
+    if (!isPlainLatLngString(marker)) {
+      return marker;
+    }
+    const [longitude, latitude] = toLngLat(marker as `${number},${number}`);
+    return `${longitude},${latitude}`;
+  }
+  const [longitude, latitude] = toLngLat(marker);
+  return `${longitude},${latitude}`;
+};
+
+const toOlaPathString = (path: StaticMapPathOptions): string => {
+  const parts = path.coordinates.map((point) => toOlaMarkerString(point));
+  if (path.widthPx !== undefined) {
+    parts.push(`width:${path.widthPx}`);
+  }
+  if (path.strokeColor !== undefined) {
+    parts.push(`stroke:${path.strokeColor}`);
+  }
+  return parts.join('|');
+};
+
+const isPlainLatLngString = (value: string): boolean =>
+  /^\s*-?\d+(\.\d+)?,-?\d+(\.\d+)?\s*$/.test(value);

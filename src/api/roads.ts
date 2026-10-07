@@ -1,20 +1,39 @@
 import { BaseApi } from './base';
 import { IndiaMapsError } from '../errors';
 import { arrayOf, asNumber, asString, type Raw } from '../utils/parse';
+import { joinLatLng, joinLngLat } from '../utils/coordinates';
 import type {
   NearestRoadsOptions,
   NearestRoadsResult,
   RoadPoint,
   SnapToRoadResult,
   SnappedPoint,
+  SpeedLimit,
+  SpeedLimitsOptions,
   SpeedLimitsResult,
 } from '../types/roads';
+import type { TravelMode } from '../types/routing';
 
-const serializePoints = (points: RoadPoint[]) =>
-  points.map((point) => `${point.latitude},${point.longitude}`).join('|');
+const serializePointsLngLat = (points: RoadPoint[]): string =>
+  joinLngLat(points, ';');
 
-const serializePointsLngLat = (points: RoadPoint[]) =>
-  points.map((point) => `${point.longitude},${point.latitude}`).join(';');
+/** Maps a {@linkcode TravelMode} to the Ola Maps roads validation mode. */
+const toOlaRoadsMode = (mode: TravelMode): string => {
+  switch (mode) {
+    case 'driving':
+      return 'DRIVING';
+    case 'walking':
+      return 'WALKING';
+    case 'biking':
+      return 'BICYCLING';
+    case 'auto':
+    case 'trucking':
+      throw new IndiaMapsError(
+        `Ola Maps nearest roads accepts mode 'driving', 'walking' or 'biking' for snap validation; '${mode}' is not supported.`,
+        'UNSUPPORTED_ERROR'
+      );
+  }
+};
 
 /**
  * Reads a snapped point from a provider payload. Ola Maps returns
@@ -41,8 +60,9 @@ const toSnappedPoint = (raw: Raw): SnappedPoint | undefined => {
   return {
     location: { latitude, longitude },
     originalIndex: asNumber(
-      raw.originalIndex ?? raw.index ?? raw.waypoint_index
+      raw.originalIndex ?? raw.original_index ?? raw.index ?? raw.waypoint_index
     ),
+    snappedType: asString(raw.snapped_type ?? raw.snappedType),
     placeId: asString(raw.placeId ?? raw.place_id),
   };
 };
@@ -81,8 +101,8 @@ export class RoadsApi extends BaseApi {
       '/routing/v1/snapToRoad',
       {
         params: {
-          points: serializePoints(points),
-          interpolate: enhancePath,
+          points: joinLatLng(points),
+          enhancePath: enhancePath,
         },
       },
       this.routeTarget
@@ -109,7 +129,8 @@ export class RoadsApi extends BaseApi {
       '/routing/v1/nearestRoads',
       {
         params: {
-          points: serializePoints(points),
+          points: joinLatLng(points),
+          mode: toOlaRoadsMode(options?.mode ?? 'driving'),
           radius: options?.radius,
         },
       },
@@ -125,7 +146,10 @@ export class RoadsApi extends BaseApi {
    * @throws {@linkcode IndiaMapsError} with code `'UNSUPPORTED_ERROR'` when
    * the configured provider is Mappls; it has no public speed-limit API.
    */
-  async speedLimits(points: RoadPoint[]): Promise<SpeedLimitsResult> {
+  async speedLimits(
+    points: RoadPoint[],
+    options?: SpeedLimitsOptions
+  ): Promise<SpeedLimitsResult> {
     this.requireAccessToken('RoadsApi.speedLimits');
     if (this.provider === 'mappls') {
       throw new IndiaMapsError(
@@ -138,14 +162,29 @@ export class RoadsApi extends BaseApi {
       '/routing/v1/speedLimits',
       {
         params: {
-          points: serializePoints(points),
+          points: joinLatLng(points),
+          snapStrategy: options?.snapStrategy
+            ? options.snapStrategy === 'snap-to-road'
+              ? 'snaptoroad'
+              : 'nearestroad'
+            : undefined,
         },
       },
       this.routeTarget
     );
     const raw = (response ?? {}) as Raw;
+    const speedLimits: SpeedLimit[] = [];
+    for (const entry of arrayOf(raw.speedLimits)) {
+      const value = asNumber(entry.speedLimit);
+      if (value !== undefined) {
+        speedLimits.push({
+          originalIndex: asNumber(entry.originalIndex),
+          speedLimit: value,
+        });
+      }
+    }
     return {
-      speedLimits: arrayOf(raw.speedLimits),
+      speedLimits,
       snappedPoints: this.normalizeSnappedPoints(response),
     };
   }
@@ -154,13 +193,27 @@ export class RoadsApi extends BaseApi {
     const raw = (response ?? {}) as Raw;
     const results = (raw.results ?? {}) as Raw;
 
+    // Ola snapToRoad nests under `snapped_points` (snake case) or the flat
+    // `results` array for nearestRoads; Mappls nests `snappedPoints` inside
+    // `results`.
     const topLevel = arrayOf<Raw | null>(raw.snappedPoints);
+    const snakeCase = arrayOf<Raw | null>(raw.snapped_points);
     const nested = arrayOf<Raw | null>(results.snappedPoints);
+    const nestedSnake = arrayOf<Raw | null>(results.snapped_points);
+    const resultArray = Array.isArray(raw.results)
+      ? arrayOf<Raw | null>(raw.results)
+      : [];
     const list = topLevel.length
       ? topLevel
-      : nested.length
-        ? nested
-        : arrayOf<Raw | null>(raw.locations);
+      : snakeCase.length
+        ? snakeCase
+        : nested.length
+          ? nested
+          : nestedSnake.length
+            ? nestedSnake
+            : resultArray.length
+              ? resultArray
+              : arrayOf<Raw | null>(raw.locations);
 
     return list
       .map((point) => (point === null ? undefined : toSnappedPoint(point)))

@@ -69,28 +69,59 @@ export type MapConfiguration = {
   pitch: number;
 };
 
-/** Marker accepted by static-map URLs: any coordinate or a raw `"lat,lng"` string. */
+/**
+ * Marker accepted by static-map URLs: any coordinate, or a raw
+ * `"latitude,longitude"` string. Ola Maps additionally accepts preformatted
+ * provider strings such as `'77.61,12.93|red|scale:0.9'`.
+ */
 export type StaticMapMarker = LatLngInput | string;
+
+/** Image format returned by Ola Maps static-map URLs. */
+export type StaticMapImageFormat = 'png' | 'jpg';
+
+/**
+ * A polyline overlay for static-map images (Ola Maps only). Passed to
+ * {@linkcode StaticMapOptions.path}.
+ */
+export type StaticMapPathOptions = {
+  /** Two or more connected points drawn in order. */
+  coordinates: StaticMapMarker[];
+
+  /** Line width in pixels, when set. */
+  widthPx?: number;
+
+  /** Line color as a hex value, e.g. `'#00ff44'`, when set. */
+  strokeColor?: string;
+};
 
 /** Options accepted by {@linkcode TilesApi.getStaticMapURL}. */
 export type StaticMapOptions = {
   /** Center coordinate in `[longitude, latitude]` order. */
   center: [longitude: number, latitude: number];
 
-  /** Zoom level. */
+  /** Zoom level. Ola Maps clamps values above 23 to 23. */
   zoom: number;
 
-  /** Image width in pixels. */
+  /** Image width in pixels (Ola Maps: 1-2048). */
   width: number;
 
-  /** Image height in pixels. */
+  /** Image height in pixels (Ola Maps: 1-2048). */
   height: number;
 
-  /** Style identifier (Ola Maps only). */
+  /**
+   * Style identifier (Ola Maps only). Static images currently render only
+   * `default-light-standard` and `default-dark-standard`.
+   */
   style?: MapStyle;
 
   /** Markers to draw on the image. */
   markers?: StaticMapMarker[];
+
+  /** Image format (Ola Maps only). @default 'png' */
+  format?: StaticMapImageFormat;
+
+  /** Path overlay to draw on the image (Ola Maps only). */
+  path?: StaticMapPathOptions;
 
   /** Custom marker icon URL (Mappls only). */
   markerIcon?: string;

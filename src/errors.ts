@@ -10,13 +10,16 @@
  *   expected result shape.
  * - `'UNSUPPORTED_ERROR'` — the feature is not available for the configured
  *   {@linkcode MapProvider} or as a public API.
+ * - `'INVALID_INPUT_ERROR'` — an argument is outside the range or shape the
+ *   provider accepts, e.g. more waypoints than the routing API allows.
  */
 export type IndiaMapsErrorCode =
   | 'CONFIGURATION_ERROR'
   | 'NETWORK_ERROR'
   | 'API_ERROR'
   | 'PARSE_ERROR'
-  | 'UNSUPPORTED_ERROR';
+  | 'UNSUPPORTED_ERROR'
+  | 'INVALID_INPUT_ERROR';
 
 /**
  * Error thrown by every fallible SDK operation.

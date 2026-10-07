@@ -1,4 +1,5 @@
 import type { LatLng } from './common';
+import type { TravelMode } from './routing';
 
 /**
  * A raw GPS coordinate accepted by roads endpoints.
@@ -21,6 +22,12 @@ export type SnappedPoint = {
   /** Index of the input point this snap corresponds to, when reported. */
   originalIndex?: number;
 
+  /**
+   * How the point was matched, when reported (Ola Maps: `'Nearest'`,
+   * `'Match'` or `'NoSegment'`).
+   */
+  snappedType?: string;
+
   /** Provider road-segment identifier, when reported. */
   placeId?: string;
 };
@@ -36,7 +43,13 @@ export type SnapToRoadResult = {
 
 /** Options accepted by {@linkcode RoadsApi.nearestRoads}. */
 export type NearestRoadsOptions = {
-  /** Search radius in meters (Ola Maps only). */
+  /**
+   * Travel mode used to validate snapping (Ola Maps only; it is sent as an
+   * uppercase mode). @default 'driving'
+   */
+  mode?: TravelMode;
+
+  /** Search radius in meters (Ola Maps only). @default 500 */
   radius?: number;
 };
 
@@ -50,16 +63,28 @@ export type NearestRoadsResult = {
   snappedPoints: SnappedPoint[];
 };
 
+/**
+ * Snapping strategy for {@linkcode RoadsApi.speedLimits}: `'snap-to-road'`
+ * aligns points to the road network with trace-based logic; `'nearest-road'`
+ * snaps each point individually to the nearest segment.
+ *
+ * @see {@linkcode SpeedLimitsOptions.snapStrategy}
+ */
+export type SpeedLimitSnapStrategy = 'snap-to-road' | 'nearest-road';
+
+/** Options accepted by {@linkcode RoadsApi.speedLimits}. */
+export type SpeedLimitsOptions = {
+  /** Snapping strategy applied to the input points. @default 'snap-to-road' */
+  snapStrategy?: SpeedLimitSnapStrategy;
+};
+
 /** A speed-limit reading for a road segment. */
 export type SpeedLimit = {
-  /** Provider road-segment identifier. */
-  placeId: string;
+  /** Index of the input point this limit belongs to, when reported. */
+  originalIndex?: number;
 
-  /** Speed limit value in `units`. */
+  /** Speed limit in km/h. */
   speedLimit: number;
-
-  /** Unit of {@linkcode SpeedLimit.speedLimit}. */
-  units: 'KPH' | 'MPH';
 };
 
 /**

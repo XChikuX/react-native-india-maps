@@ -10,6 +10,18 @@ const jsonResponse = (body: unknown) => ({
 
 const g = globalThis as unknown as { fetch: jest.Mock };
 
+/** URL of the most recent request in the current test. */
+const requestedUrl = (): string => {
+  const calls = (g.fetch as jest.Mock).mock.calls;
+  return calls[calls.length - 1]?.[0] as string;
+};
+
+/** Init object of the most recent request in the current test. */
+const lastRequestInit = (): Record<string, unknown> => {
+  const calls = (g.fetch as jest.Mock).mock.calls;
+  return (calls[calls.length - 1]?.[1] ?? {}) as Record<string, unknown>;
+};
+
 describe('API endpoint construction (Ola Maps)', () => {
   let client: IndiaMapsClient;
 
@@ -18,7 +30,7 @@ describe('API endpoint construction (Ola Maps)', () => {
     g.fetch = jest.fn().mockResolvedValue(jsonResponse({ results: [] }));
   });
 
-  it('uses Ola elevation endpoint', async () => {
+  it('uses the Ola single-elevation endpoint', async () => {
     g.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
         results: [
@@ -26,46 +38,252 @@ describe('API endpoint construction (Ola Maps)', () => {
         ],
       })
     );
-    await client.elevation.getElevation(12.9, 77.6);
-    expect(g.fetch).toHaveBeenCalled();
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain('/elevation/v1/getElevation');
-    expect(url).toContain('locations=12.9%2C77.6');
-    expect(url).toContain('api_key=test-token');
-  });
-
-  it('uses Ola route optimizer endpoint', async () => {
-    await client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7']);
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain(
-      '/routing/v1/routeOptimizer/driving/77.6,12.9;77.7,13.05'
+    await client.elevation.getElevation({ lat: 12.9, lng: 77.6 });
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/places/v1/elevation'
     );
-    expect(url).toContain('api_key=test-token');
+    expect(requestedUrl()).toContain('location=12.9%2C77.6');
+    expect(requestedUrl()).toContain('api_key=test-token');
+    expect(lastRequestInit().method).toBeUndefined();
   });
 
-  it('uses Ola snap to road endpoint', async () => {
+  it('uses the Ola multi-elevation endpoint with a JSON body', async () => {
+    await client.elevation.getMultiElevation([
+      { lat: 12.9, lng: 77.6 },
+      '13.05,77.7',
+    ]);
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/places/v1/elevation'
+    );
+    expect(lastRequestInit().method).toBe('POST');
+    expect(lastRequestInit().body).toBe(
+      JSON.stringify({ locations: ['12.9,77.6', '13.05,77.7'] })
+    );
+  });
+
+  it('rejects more than 25 elevation coordinates', async () => {
+    const points = Array.from({ length: 26 }, (_, i) => ({
+      lat: 12.9 + i / 100,
+      lng: 77.6,
+    }));
+    await expect(client.elevation.getMultiElevation(points)).rejects.toThrow(
+      expect.objectContaining({ code: 'INVALID_INPUT_ERROR' })
+    );
+  });
+
+  it('posts to the Ola route optimizer endpoint', async () => {
+    await client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+      roundTrip: true,
+    });
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/routing/v1/routeOptimizer'
+    );
+    expect(requestedUrl()).toContain('locations=12.9%2C77.6%7C13.05%2C77.7');
+    expect(requestedUrl()).toContain('round_trip=true');
+    expect(requestedUrl()).toContain('mode=driving');
+    expect(requestedUrl()).toContain('api_key=test-token');
+    expect(lastRequestInit().method).toBe('POST');
+  });
+
+  it('rejects an unsupported optimizer destination anchor', async () => {
+    await expect(
+      client.routing.routeOptimizer(['12.9,77.6', '13.05,77.7'], {
+        destination: 'first',
+      })
+    ).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT_ERROR' }));
+  });
+
+  it('uses the Ola snap to road endpoint with enhancePath', async () => {
     await client.roads.snapToRoad([{ latitude: 12.9, longitude: 77.6 }], true);
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain('/routing/v1/snapToRoad');
-    expect(url).toContain('points=12.9%2C77.6');
+    expect(requestedUrl()).toContain('/routing/v1/snapToRoad');
+    expect(requestedUrl()).toContain('points=12.9%2C77.6');
+    expect(requestedUrl()).toContain('enhancePath=true');
   });
 
-  it('uses Ola directions endpoint with waypoint order preserved', async () => {
+  it('uses the Ola nearest roads endpoint with a validation mode', async () => {
+    await client.roads.nearestRoads([{ latitude: 12.9, longitude: 77.6 }], {
+      mode: 'biking',
+      radius: 250,
+    });
+    expect(requestedUrl()).toContain('/routing/v1/nearestRoads');
+    expect(requestedUrl()).toContain('points=12.9%2C77.6');
+    expect(requestedUrl()).toContain('mode=BICYCLING');
+    expect(requestedUrl()).toContain('radius=250');
+  });
+
+  it('maps the speed limit snap strategy', async () => {
+    await client.roads.speedLimits([{ latitude: 12.9, longitude: 77.6 }], {
+      snapStrategy: 'nearest-road',
+    });
+    expect(requestedUrl()).toContain('/routing/v1/speedLimits');
+    expect(requestedUrl()).toContain('snapStrategy=nearestroad');
+  });
+
+  it('posts to the Ola directions endpoint', async () => {
     await client.routing.getDirections('12.9,77.6', '13.05,77.7');
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain(
-      '/routing/v1/directions/driving/77.6,12.9;77.7,13.05'
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/routing/v1/directions'
     );
-    expect(url).toContain('api_key=test-token');
+    expect(requestedUrl()).toContain('origin=12.9%2C77.6');
+    expect(requestedUrl()).toContain('destination=13.05%2C77.7');
+    expect(requestedUrl()).toContain('mode=driving');
+    expect(requestedUrl()).toContain('api_key=test-token');
+    expect(lastRequestInit().method).toBe('POST');
   });
 
-  it('uses Ola autocomplete endpoint', async () => {
+  it('sends waypoints pipe-separated in lat,lng order', async () => {
+    await client.routing.getDirections('12.9,77.6', '13.2,77.9', {
+      waypoints: ['13.0,77.7', '13.1,77.8'],
+    });
+    expect(requestedUrl()).toContain('waypoints=13.0%2C77.7%7C13.1%2C77.8');
+  });
+
+  it('rejects trucking on Ola routing', async () => {
+    await expect(
+      client.routing.getDirections('12.9,77.6', '13.0,77.7', {
+        mode: 'trucking',
+      })
+    ).rejects.toThrow(expect.objectContaining({ code: 'UNSUPPORTED_ERROR' }));
+  });
+
+  it('uses the Ola distance matrix endpoint', async () => {
+    await client.routing.getDistanceMatrix(['12.9,77.6'], ['13.0,77.7'], {
+      routePreference: 'shortest',
+    });
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/routing/v1/distanceMatrix'
+    );
+    expect(requestedUrl()).toContain('origins=12.9%2C77.6');
+    expect(requestedUrl()).toContain('destinations=13.0%2C77.7');
+    expect(requestedUrl()).toContain('route_preference=shortest');
+  });
+
+  it('uses the Ola autocomplete endpoint', async () => {
     g.fetch = jest.fn().mockResolvedValue(jsonResponse({ predictions: [] }));
     await client.places.autocomplete('bangalore');
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain('/places/v1/autocomplete');
-    expect(url).toContain('input=bangalore');
-    expect(url).toContain('api_key=test-token');
+    expect(requestedUrl()).toContain('/places/v1/autocomplete');
+    expect(requestedUrl()).toContain('input=bangalore');
+    expect(requestedUrl()).toContain('api_key=test-token');
+  });
+
+  it('uses the Ola nearby search ranking and limit params', async () => {
+    g.fetch = jest.fn().mockResolvedValue(jsonResponse({ predictions: [] }));
+    await client.places.nearbySearch('12.9,77.6', {
+      rankBy: 'distance',
+      limit: 20,
+      withCentroid: true,
+    });
+    expect(requestedUrl()).toContain('/places/v1/nearbysearch');
+    expect(requestedUrl()).toContain('rankBy=distance');
+    expect(requestedUrl()).toContain('limit=20');
+    expect(requestedUrl()).toContain('withCentroid=true');
+  });
+
+  it('uses the Ola address validation endpoint', async () => {
+    g.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({
+        result: {
+          validated: true,
+          validated_address: 'Pune, Maharashtra',
+        },
+        status: 'validation_done',
+      })
+    );
+    const match = await client.places.addressValidation('Pune');
+    expect(requestedUrl()).toContain('/places/v1/addressvalidation');
+    expect(requestedUrl()).toContain('address=Pune');
+    expect(match).toEqual({
+      isAddressValid: true,
+      validatedAddress: 'Pune, Maharashtra',
+    });
+  });
+
+  it('creates geofences on the Ola geofence endpoint', async () => {
+    g.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse({ geofenceId: 'f1', status: 'created' }));
+    const created = await client.geofencing.create({
+      name: 'Depot',
+      projectId: 'p1',
+      geometry: {
+        type: 'circle',
+        center: { lat: 12.9, lng: 77.6 },
+        radius: 500,
+      },
+    });
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/places/v1/geofence'
+    );
+    expect(lastRequestInit().method).toBe('POST');
+    expect(lastRequestInit().body).toBe(
+      JSON.stringify({
+        name: 'Depot',
+        status: 'active',
+        projectId: 'p1',
+        type: 'circle',
+        radius: 500,
+        coordinates: [[12.9, 77.6]],
+      })
+    );
+    expect(created).toEqual({ fenceId: 'f1', message: undefined });
+  });
+
+  it('lists geofences with required pagination params', async () => {
+    g.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({
+        page: 2,
+        size: 5,
+        total: 7,
+        geofences: [
+          {
+            geofenceId: 'f1',
+            name: 'Depot',
+            type: 'circle',
+            coordinates: [[12.9, 77.6]],
+            radius: 500,
+            status: 'active',
+            projectId: 'p1',
+          },
+        ],
+      })
+    );
+    const list = await client.geofencing.list('p1', { page: 2, pageSize: 5 });
+    expect(requestedUrl()).toContain(
+      'https://api.olamaps.io/places/v1/geofences'
+    );
+    expect(requestedUrl()).toContain('projectId=p1');
+    expect(requestedUrl()).toContain('page=2');
+    expect(requestedUrl()).toContain('size=5');
+    expect(list.total).toBe(7);
+    expect(list.fences[0]).toEqual({
+      fenceId: 'f1',
+      name: 'Depot',
+      projectId: 'p1',
+      geometry: {
+        type: 'circle',
+        center: { lat: 12.9, lng: 77.6 },
+        radius: 500,
+      },
+      status: 'active',
+    });
+  });
+
+  it('checks geofence status with the coordinates param', async () => {
+    g.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse({ geofenceId: 'f1', isInside: true }));
+    const status = await client.geofencing.checkStatus('f1', {
+      lat: 12.9,
+      lng: 77.6,
+    });
+    expect(requestedUrl()).toContain('/places/v1/geofence/status');
+    expect(requestedUrl()).toContain('geofenceId=f1');
+    expect(requestedUrl()).toContain('coordinates=12.9%2C77.6');
+    expect(status).toEqual({
+      fenceId: 'f1',
+      isInside: true,
+      message: undefined,
+    });
   });
 
   it('throws a configuration error without a token', async () => {
@@ -95,10 +313,11 @@ describe('API endpoint construction (Mappls)', () => {
         ],
       })
     );
-    await client.elevation.getElevation(12.9, 77.6);
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain('https://sdk.mappls.com/map/utils/elevation');
-    expect(url).toContain('locations=12.9%2C77.6');
+    await client.elevation.getElevation('12.9,77.6');
+    expect(requestedUrl()).toContain(
+      'https://sdk.mappls.com/map/utils/elevation'
+    );
+    expect(requestedUrl()).toContain('locations=12.9%2C77.6');
   });
 
   it('uses Mappls autosuggest endpoint', async () => {
@@ -106,12 +325,11 @@ describe('API endpoint construction (Mappls)', () => {
       .fn()
       .mockResolvedValue(jsonResponse({ suggestedLocations: [] }));
     await client.places.autocomplete('delhi');
-    const url = (g.fetch as jest.Mock).mock.calls[0][0] as string;
-    expect(url).toContain(
+    expect(requestedUrl()).toContain(
       'https://search.mappls.com/search/places/autosuggest/json'
     );
-    expect(url).toContain('query=delhi');
-    expect(url).toContain('access_token=test-token');
+    expect(requestedUrl()).toContain('query=delhi');
+    expect(requestedUrl()).toContain('access_token=test-token');
   });
 
   it('rejects geofencing with an unsupported error', async () => {
@@ -123,6 +341,18 @@ describe('API endpoint construction (Mappls)', () => {
   it('rejects speed limits with an unsupported error', async () => {
     await expect(
       client.roads.speedLimits([{ latitude: 12.9, longitude: 77.6 }])
+    ).rejects.toThrow(expect.objectContaining({ code: 'UNSUPPORTED_ERROR' }));
+  });
+
+  it('rejects address validation with an unsupported error', async () => {
+    await expect(client.places.addressValidation('Pune')).rejects.toThrow(
+      expect.objectContaining({ code: 'UNSUPPORTED_ERROR' })
+    );
+  });
+
+  it('rejects auto mode on Mappls routing', async () => {
+    await expect(
+      client.routing.getDirections('12.9,77.6', '13.0,77.7', { mode: 'auto' })
     ).rejects.toThrow(expect.objectContaining({ code: 'UNSUPPORTED_ERROR' }));
   });
 });
@@ -182,7 +412,7 @@ describe('Response normalization (Ola Maps)', () => {
     });
   });
 
-  it('normalizes directions routes and steps', async () => {
+  it('normalizes legacy OSRM-style directions responses', async () => {
     g.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
         code: 'Ok',
@@ -211,6 +441,44 @@ describe('Response normalization (Ola Maps)', () => {
     expect(result.waypoints?.[0]?.location).toEqual([77.6, 12.9]);
   });
 
+  it('normalizes current Google-style directions responses', async () => {
+    g.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({
+        status: 'OK',
+        routes: [
+          {
+            summary: 'NH44',
+            overview_polyline: 'u`nAoc~uMeg',
+            legs: [
+              {
+                distance: 3836,
+                duration: 698,
+                steps: [
+                  {
+                    distance: 476,
+                    duration: 99,
+                    instructions: 'Head west on NH48',
+                    maneuver: 'turn-right',
+                    start_location: { lat: 12.90934, lng: 77.62169 },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = await client.routing.getDirections('12.9,77.6', '13.0,77.7');
+    expect(result.code).toBe('OK');
+    expect(result.routes[0]?.geometry).toBe('u`nAoc~uMeg');
+    expect(result.routes[0]?.distance).toBe(3836);
+    expect(result.routes[0]?.duration).toBe(698);
+    const step = result.routes[0]?.legs?.[0]?.steps?.[0];
+    expect(step?.instructions).toBe('Head west on NH48');
+    expect(step?.location).toEqual([77.62169, 12.90934]);
+  });
+
   it('normalizes Ola distance matrix cells into grids', async () => {
     g.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
@@ -232,6 +500,29 @@ describe('Response normalization (Ola Maps)', () => {
     expect(result.durations).toEqual([[1200]]);
   });
 
+  it('normalizes optimizer waypoint_order from the first route', async () => {
+    g.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({
+        status: 'OK',
+        routes: [
+          {
+            waypoint_order: [0, 3, 2, 1],
+            legs: [{ distance: 100, duration: 20 }],
+          },
+        ],
+      })
+    );
+
+    const result = await client.routing.routeOptimizer([
+      '12.9,77.6',
+      '13.0,77.7',
+      '13.1,77.8',
+      '13.2,77.9',
+    ]);
+    expect(result.order).toEqual([0, 3, 2, 1]);
+    expect(result.distance).toBe(100);
+  });
+
   it('normalizes elevation results', async () => {
     g.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
@@ -245,7 +536,7 @@ describe('Response normalization (Ola Maps)', () => {
       })
     );
 
-    const elevation = await client.elevation.getElevation(12.9, 77.6);
+    const elevation = await client.elevation.getElevation('12.9,77.6');
     expect(elevation.elevation).toBe(920);
     expect(elevation.location).toEqual({ lat: 12.9, lng: 77.6 });
   });
@@ -253,11 +544,12 @@ describe('Response normalization (Ola Maps)', () => {
   it('normalizes snapped points', async () => {
     g.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
-        snappedPoints: [
+        status: 'SUCCESS',
+        snapped_points: [
           {
-            location: { latitude: 12.9, longitude: 77.6 },
-            originalIndex: 0,
-            placeId: 'road-1',
+            location: { lat: 12.9, lng: 77.6 },
+            original_index: 0,
+            snapped_type: 'Match',
           },
         ],
       })
@@ -269,21 +561,33 @@ describe('Response normalization (Ola Maps)', () => {
     expect(result.snappedPoints[0]).toEqual({
       location: { latitude: 12.9, longitude: 77.6 },
       originalIndex: 0,
-      placeId: 'road-1',
+      snappedType: 'Match',
+      placeId: undefined,
     });
   });
 
-  it('validates addresses from the first geocode match', async () => {
+  it('normalizes speed limit entries keyed by original index', async () => {
     g.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
-        geocodingResults: [
-          { place_id: 'p3', formatted_address: 'Pune, Maharashtra' },
+        status: 'SUCCESS',
+        snappedPoints: [
+          {
+            location: { latitude: 12.9, longitude: 77.6 },
+            originalIndex: 0,
+          },
         ],
+        speedLimits: [{ originalIndex: 0, speedLimit: 60 }],
       })
     );
 
-    const match = await client.places.addressValidation('Pune');
-    expect(match?.formattedAddress).toBe('Pune, Maharashtra');
+    const result = await client.roads.speedLimits([
+      { latitude: 12.9, longitude: 77.6 },
+    ]);
+    expect(result.speedLimits).toEqual([{ originalIndex: 0, speedLimit: 60 }]);
+    expect(result.snappedPoints[0]?.location).toEqual({
+      latitude: 12.9,
+      longitude: 77.6,
+    });
   });
 
   it('wraps network failures in IndiaMapsError', async () => {

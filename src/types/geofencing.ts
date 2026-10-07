@@ -3,6 +3,9 @@ import type { LatLngLiteral } from './common';
 /** Geofence boundary shape. */
 export type GeofenceType = 'circle' | 'polygon';
 
+/** Activation state of a geofence. */
+export type GeofenceStatus = 'active' | 'inactive';
+
 /** Circular geofence boundary. */
 export type GeofenceCircle = {
   type: 'circle';
@@ -40,29 +43,47 @@ export type GeofenceData = {
   /** Fence boundary shape. */
   geometry: GeofenceGeometry;
 
-  /** Arbitrary string metadata stored with the fence. */
-  metadata?: Record<string, string>;
+  /** Initial activation state. @default 'active' */
+  status?: GeofenceStatus;
 };
 
-/** A stored geofence returned by the geofencing API. */
-export type Geofence = GeofenceData & {
+/** A stored geofence returned by {@linkcode GeofencingApi.getById}. */
+export type Geofence = {
   /** Server-assigned fence identifier. */
   fenceId: string;
 
-  /** Creation timestamp, when the provider reports one. */
-  createdAt?: string;
+  /** Human-readable geofence name. */
+  name: string;
 
-  /** Last-update timestamp, when the provider reports one. */
-  updatedAt?: string;
+  /** Ola Maps project the fence belongs to. */
+  projectId: string;
+
+  /** Fence boundary shape. */
+  geometry: GeofenceGeometry;
+
+  /** Activation state, when reported. */
+  status?: GeofenceStatus;
+};
+
+/**
+ * Acknowledgment returned by {@linkcode GeofencingApi.create},
+ * {@linkcode GeofencingApi.update} and {@linkcode GeofencingApi.deleteById}.
+ */
+export type GeofenceWriteResult = {
+  /** Identifier of the fence that was created or modified. */
+  fenceId: string;
+
+  /** Provider confirmation text, when reported. */
+  message?: string;
 };
 
 /** Options accepted by {@linkcode GeofencingApi.list}. */
 export type GeofenceListOptions = {
-  /** 1-based page number to fetch. */
+  /** 1-based page number to fetch. @default 1 */
   page?: number;
 
-  /** Maximum number of fences to return per page. */
-  limit?: number;
+  /** Number of fences per page. @default 10 */
+  pageSize?: number;
 };
 
 /** One page of geofences returned by {@linkcode GeofencingApi.list}. */
@@ -73,11 +94,11 @@ export type GeofencePage = {
   /** Total number of geofences across all pages, when reported. */
   total?: number;
 
-  /** Requested page number. */
-  page?: number;
+  /** Page number that was fetched. */
+  page: number;
 
-  /** Requested page size. */
-  limit?: number;
+  /** Page size that was requested. */
+  pageSize: number;
 };
 
 /** Result of {@linkcode GeofencingApi.checkStatus}. */
@@ -86,8 +107,8 @@ export type GeofenceStatusResult = {
   fenceId: string;
 
   /** Whether the point lies inside the fence. */
-  status: 'inside' | 'outside';
+  isInside: boolean;
 
-  /** Distance in meters from the boundary, when reported. */
-  distance?: number;
+  /** Provider explanation text, when reported. */
+  message?: string;
 };

@@ -83,6 +83,11 @@ describe('base URL overrides', () => {
     });
 
     it('routes geofence creation through the configured SDK base URL', async () => {
+      g.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ geofenceId: 'f1', status: 'created' })
+        );
       const client = new IndiaMapsClient({ apiKey: 'k', sdkBaseUrl: PROXY });
       await client.geofencing.create({
         name: 'Depot',
@@ -124,7 +129,9 @@ describe('base URL overrides', () => {
         apiKey: 'k',
         routeBaseUrl: 'https://route.example.com',
       });
-      await client.elevation.getElevation(12.9, 77.6).catch(() => undefined);
+      await client.elevation
+        .getElevation({ lat: 12.9, lng: 77.6 })
+        .catch(() => undefined);
       expect(requestedUrl()).toContain('https://route.example.com');
     });
   });
@@ -139,7 +146,9 @@ describe('base URL overrides', () => {
       await client.routing.getDirections('12.9,77.6', '13.0,77.7');
       expect(requestedUrl()).toContain(PROXY);
 
-      await client.elevation.getElevation(12.9, 77.6).catch(() => undefined);
+      await client.elevation
+        .getElevation({ lat: 12.9, lng: 77.6 })
+        .catch(() => undefined);
       expect(requestedUrl()).toContain(PROXY);
 
       await client.geofencing.list('p1');
