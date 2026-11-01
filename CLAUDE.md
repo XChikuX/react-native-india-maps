@@ -21,6 +21,10 @@ bun run build
 # Run tests
 bun run test
 
+# Run integration tests (local HTTP server suite always runs;
+# live API suites need OLA_MAPS_API_KEY / MAPPLS_ACCESS_TOKEN)
+bun run test:integration
+
 # Lint
 bun run lint
 
@@ -37,6 +41,8 @@ bun run typecheck
 - **`src/types/`** — Shared TypeScript types (pure types only — no runtime helpers)
 - **`src/utils/`** — Internal runtime helpers (coordinate conversion, config resolution, response parsing); not part of the public API
 - **`plugin/`** — Expo config plugin for location permissions
+- **`integration/`** — Integration tests: a local in-process HTTP server suite (always runs) plus live Ola Maps / Mappls suites gated behind env vars; run via `bun run test:integration`
+- **`example/`** — Expo development-build app demonstrating every SDK feature (map, places, routing, geofencing, utilities) with a runtime provider switcher; see `example/README.md`
 
 ## Conventions
 

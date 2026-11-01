@@ -2,6 +2,7 @@
   "extends": "./tsconfig",
   "exclude": [
     "example",
+    "integration",
     "lib",
     "src/**/__tests__",
     "test"

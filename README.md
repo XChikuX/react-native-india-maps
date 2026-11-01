@@ -22,6 +22,10 @@ bun add react-native-india-maps @maplibre/maplibre-react-native@^11.5.0
 
 Requires React `>=19.2.0` and React Native `>=0.83.0` (Expo SDK 55+ development builds are supported). See [docs/installation.md](./docs/installation.md) for details.
 
+## Example app
+
+The [`example/`](./example) directory contains an Expo development-build app demonstrating every SDK feature — map with styles and overlays, places (including the `useAutocomplete` hook), routing with routes drawn on the map, geofencing CRUD, and utilities (elevation, snap-to-road, speed limits, static maps) — with a runtime switcher between the Ola Maps and Mappls providers. See [`example/README.md`](./example/README.md).
+
 ## Expo setup
 
 Use an Expo development build, not Expo Go.

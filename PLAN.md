@@ -192,11 +192,11 @@ react-native-ola-maps/
 
 ### Phase 5: Polish
 
-- [ ] Example app with all features demonstrated
+- [x] Example app with all features demonstrated (`example/`, Expo development build)
 - [x] Comprehensive README
 - [x] API documentation
 - [x] Unit tests
-- [ ] Integration tests
+- [x] Integration tests (`integration/`: local HTTP server suite + gated live API suites, `bun run test:integration`)
 
 ---
 

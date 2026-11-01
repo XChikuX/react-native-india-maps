@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "India Maps Example",
+    "slug": "react-native-india-maps-example",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "indiamaps-example",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.indiamaps"
+    },
+    "android": {
+      "package": "com.example.indiamaps"
+    },
+    "plugins": [
+      "@maplibre/maplibre-react-native",
+      [
+        "react-native-india-maps",
+        {
+          "iosWhenInUsePermission": "The example app shows your location on the map.",
+          "backgroundLocation": false
+        }
+      ]
+    ]
+  }
+}

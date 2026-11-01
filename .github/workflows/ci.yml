@@ -35,6 +35,17 @@ jobs:
       - name: Run unit tests
         run: bun run test --maxWorkers=2 --coverage
 
+      # Runs the local-server integration suite; live API suites are skipped
+      # unless the matching secrets are configured on the repository. The
+      # geofencing round trip additionally requires
+      # OLA_MAPS_GEOFENCE_TESTS=1 because it writes to the account.
+      - name: Run integration tests
+        run: bun run test:integration --maxWorkers=2
+        env:
+          OLA_MAPS_API_KEY: ${{ secrets.OLA_MAPS_API_KEY }}
+          MAPPLS_ACCESS_TOKEN: ${{ secrets.MAPPLS_ACCESS_TOKEN }}
+          OLA_MAPS_GEOFENCE_TESTS: ${{ secrets.OLA_MAPS_GEOFENCE_TESTS }}
+
   build-library:
     runs-on: ubuntu-latest
     steps:

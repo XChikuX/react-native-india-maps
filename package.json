@@ -35,7 +35,9 @@
   ],
   "scripts": {
     "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
     "typecheck": "tsc --noEmit",
+    "typecheck:integration": "tsc --noEmit -p tsconfig.integration.json",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "build": "bob build",
     "clean": "del-cli lib",
@@ -122,6 +124,9 @@
     ],
     "modulePathIgnorePatterns": [
       "<rootDir>/lib/"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/integration/"
     ],
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native|@maplibre)/)"

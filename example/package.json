@@ -1,0 +1,23 @@
+{
+  "name": "react-native-india-maps-example",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maplibre/maplibre-react-native": "^11.5.0",
+    "expo": "~55.0.0",
+    "react": "19.2.8",
+    "react-native": "0.83.10",
+    "react-native-india-maps": "file:.."
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~6.0.3"
+  }
+}
